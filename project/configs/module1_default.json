@@ -1,0 +1,22 @@
+{
+  "seed": 42,
+  "lgbm_params": {
+    "n_estimators": 150,
+    "learning_rate": 0.05,
+    "num_leaves": 7,
+    "max_depth": 4,
+    "min_child_samples": 5,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_alpha": 0.1,
+    "reg_lambda": 0.1,
+    "class_weight": "balanced"
+  },
+  "decision_threshold": 0.5,
+  "walk_forward_n_splits": 5,
+  "walk_forward_min_train_size": 150,
+  "lead_time_max_lookback": 6,
+  "lead_time_target_alert_rate": 0.15,
+  "cpu_only_cols": ["cpu_utilization", "cpu_utilization_delta1", "cpu_utilization_delta2", "cpu_utilization_delta4"],
+  "shap_perturbation_signals": ["p99_latency_ms", "cpu_utilization", "providerRPC_MCR", "memory_utilization"]
+}

@@ -1,0 +1,17 @@
+# Datasets — vendored, huge (~221GB combined), not part of this project's own code.
+# Each DataSetNN/ subfolder is also its own independent git repo (has its own .git),
+# so excluding them here also avoids embedded-repository confusion.
+DataSet01/
+DataSet02/
+DataSet03/
+DataSet04/
+DataSet05/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local/editor-specific, not meant for the shared repo
+.claude/
+.vscode/

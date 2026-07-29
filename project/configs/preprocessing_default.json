@@ -1,0 +1,11 @@
+{
+  "bucket_seconds": 120,
+  "provider_metrics": ["providerRPC_MCR", "providerRPC_RT", "HTTP_MCR", "HTTP_RT"],
+  "ffill_limit": 2,
+  "delta_windows": [1, 2, 4],
+  "violation_percentile": 0.90,
+  "train_frac": 0.75,
+  "callgraph_chunksize": 500000,
+  "load_chunksize": 500000,
+  "resource_chunksize": 500000
+}

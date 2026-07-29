@@ -1,0 +1,19 @@
+{
+  "seed": 42,
+  "setpoint": 0.10,
+  "kp": 0.6,
+  "ki": 0.15,
+  "initial_threshold": 0.10,
+  "threshold_bounds": [0.01, 0.9],
+  "base_max_step": 0.05,
+  "width_sensitivity": 3.0,
+  "alpha_target": 0.10,
+  "alpha_bounds": [0.02, 0.5],
+  "aci_gamma": 0.05,
+  "score_window": 20,
+  "oscillation_window": 8,
+  "oscillation_k": 4.0,
+  "step_response_high": 0.6,
+  "step_response_pre_steps": 15,
+  "step_response_post_steps": 40
+}

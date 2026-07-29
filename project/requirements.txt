@@ -1,0 +1,7 @@
+pandas
+pyarrow
+matplotlib
+pytest
+lightgbm
+shap
+scikit-learn
