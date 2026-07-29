@@ -1,0 +1,208 @@
+{
+  "tag": "primary",
+  "holdout": {
+    "fused_auc_roc": 0.651685393258427,
+    "fused_auc_pr": 0.03125,
+    "fused_brier": 0.012347326257544962,
+    "baseline_auc_roc": 0.4269662921348315,
+    "baseline_auc_pr": 0.019230769230769232,
+    "baseline_brier": 0.014329574089550186,
+    "note": "Single-holdout AUC-PR is high-variance here given how few positives the test split has; treat the walk-forward mean below as the more reliable estimate."
+  },
+  "walk_forward": {
+    "folds": [
+      {
+        "fold": 0,
+        "train_size": 150,
+        "test_size": 42,
+        "fused_auc_roc": 0.5879629629629629,
+        "fused_auc_pr": 0.5398678253383138,
+        "baseline_auc_roc": 0.5972222222222222,
+        "baseline_auc_pr": 0.5477600109125569
+      },
+      {
+        "fold": 1,
+        "train_size": 192,
+        "test_size": 42,
+        "fused_auc_roc": 0.4375,
+        "fused_auc_pr": 0.24174722846597846,
+        "baseline_auc_roc": 0.3529411764705882,
+        "baseline_auc_pr": 0.20255896789613895
+      },
+      {
+        "fold": 2,
+        "train_size": 234,
+        "test_size": 42,
+        "fused_auc_roc": null,
+        "fused_auc_pr": null,
+        "baseline_auc_roc": null,
+        "baseline_auc_pr": null
+      },
+      {
+        "fold": 3,
+        "train_size": 276,
+        "test_size": 42,
+        "fused_auc_roc": 0.7804878048780488,
+        "fused_auc_pr": 0.1,
+        "baseline_auc_roc": 0.6341463414634146,
+        "baseline_auc_pr": 0.0625
+      },
+      {
+        "fold": 4,
+        "train_size": 318,
+        "test_size": 42,
+        "fused_auc_roc": null,
+        "fused_auc_pr": null,
+        "baseline_auc_roc": null,
+        "baseline_auc_pr": null
+      }
+    ],
+    "mean_fused_auc_roc": 0.6019835892803372,
+    "mean_fused_auc_pr": 0.29387168460143076,
+    "mean_baseline_auc_roc": 0.5281032467187416,
+    "mean_baseline_auc_pr": 0.2709396596028986
+  },
+  "lead_time_comparison": {
+    "target_alert_rate": 0.15,
+    "fused_threshold": 0.32134529699634135,
+    "baseline_threshold": 0.5643324924425668,
+    "n_episodes": 18,
+    "fused_lead_times": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      6,
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    "baseline_lead_times": [
+      2,
+      0,
+      3,
+      0,
+      5,
+      1,
+      2,
+      1,
+      0,
+      1,
+      2,
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "mean_fused_lead_time": 0.4444444444444444,
+    "mean_baseline_lead_time": 1.0555555555555556,
+    "fused_beats_baseline": false
+  },
+  "generalization_check": {
+    "tag": "secondary",
+    "n_train": 270,
+    "n_test": 90,
+    "auc_roc": 0.6242699545749514,
+    "auc_pr": 0.4201136766301544,
+    "brier_score": 0.22034863775706806
+  },
+  "shap_sanity_check": {
+    "per_signal": [
+      {
+        "signal": "p99_latency_ms",
+        "family_perturbed": [
+          "p99_latency_ms",
+          "p99_latency_ms_delta1",
+          "p99_latency_ms_delta2",
+          "p99_latency_ms_delta4"
+        ],
+        "baseline_risk": 0.015165242882126373,
+        "perturbed_risk": 0.1310690508531983,
+        "risk_increased": true,
+        "family_shap_baseline": 1.0416302470568057,
+        "family_shap_perturbed": 1.3688363008730662,
+        "family_rank_by_shap": 1,
+        "dominant_feature_overall": "p99_latency_ms",
+        "correctly_attributed": true,
+        "pass": true
+      },
+      {
+        "signal": "cpu_utilization",
+        "family_perturbed": [
+          "cpu_utilization",
+          "cpu_utilization_delta1",
+          "cpu_utilization_delta2",
+          "cpu_utilization_delta4"
+        ],
+        "baseline_risk": 0.015165242882126373,
+        "perturbed_risk": 0.021279649577145364,
+        "risk_increased": true,
+        "family_shap_baseline": 0.33159185990315576,
+        "family_shap_perturbed": 1.0433768716549934,
+        "family_rank_by_shap": 1,
+        "dominant_feature_overall": "p99_latency_ms",
+        "correctly_attributed": true,
+        "pass": true
+      },
+      {
+        "signal": "providerRPC_MCR",
+        "family_perturbed": [
+          "providerRPC_MCR",
+          "providerRPC_MCR_delta1",
+          "providerRPC_MCR_delta2",
+          "providerRPC_MCR_delta4"
+        ],
+        "baseline_risk": 0.015165242882126373,
+        "perturbed_risk": 0.0608340861994979,
+        "risk_increased": true,
+        "family_shap_baseline": 0.4157147811620367,
+        "family_shap_perturbed": 1.871612082881424,
+        "family_rank_by_shap": 1,
+        "dominant_feature_overall": "providerRPC_MCR_delta4",
+        "correctly_attributed": true,
+        "pass": true
+      },
+      {
+        "signal": "memory_utilization",
+        "family_perturbed": [
+          "memory_utilization",
+          "memory_utilization_delta1",
+          "memory_utilization_delta2",
+          "memory_utilization_delta4"
+        ],
+        "baseline_risk": 0.015165242882126373,
+        "perturbed_risk": 0.010014132663508047,
+        "risk_increased": false,
+        "family_shap_baseline": 0.5383004316471685,
+        "family_shap_perturbed": 0.386412680946862,
+        "family_rank_by_shap": 3,
+        "dominant_feature_overall": "p99_latency_ms",
+        "correctly_attributed": false,
+        "pass": false
+      }
+    ],
+    "n_tested": 4,
+    "n_pass": 3,
+    "all_pass": false
+  },
+  "pass_criteria": {
+    "fused_beats_cpu_baseline_auc_pr_holdout": true,
+    "fused_beats_cpu_baseline_auc_pr_walkforward": true,
+    "lead_time_positive_and_beats_baseline": false,
+    "shap_sanity_check_all_pass": false,
+    "shap_sanity_check_majority_pass": true
+  }
+}
