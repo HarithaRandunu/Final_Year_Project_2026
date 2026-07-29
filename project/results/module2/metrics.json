@@ -1,0 +1,43 @@
+{
+  "n_static_batch_init_events": 306,
+  "n_churn_events_total": 87,
+  "n_usable_events": 87,
+  "regret_validation": {
+    "n_rounds": 87,
+    "final_cumulative_regret": {
+      "combined_system": 4.676723039308393,
+      "random": 5.731123551187107,
+      "heuristic_only": 0.48550824522892205
+    },
+    "mean_reward": {
+      "combined_system": 0.31782671082862385,
+      "random": 0.3057071647150755,
+      "heuristic_only": 0.3660015935191925,
+      "oracle": 0.3715821480620537
+    }
+  },
+  "discounted_vs_vanilla_ablation": {
+    "sub_window_buckets": [
+      238,
+      263
+    ],
+    "n_rounds_in_window": 43,
+    "discounted_mean_reward_in_window": 0.3167391670876918,
+    "vanilla_mean_reward_in_window": 0.33035904987800135,
+    "discounted_mean_reward_full": 0.30437089300061193,
+    "vanilla_mean_reward_full": 0.31110255920731666,
+    "discounted_beats_vanilla_in_window": false
+  },
+  "convergence_check": {
+    "rolling_window": 20,
+    "entropy_at_first_full_window": 2.857102837442002,
+    "final_rolling_entropy": 2.995732273553991,
+    "max_possible_entropy": 2.995732273553991,
+    "entropy_at_shift_start": 2.995732273553991,
+    "converges": false
+  },
+  "pass_criteria": {
+    "combined_beats_random_and_heuristic_regret": false,
+    "discounted_beats_vanilla_on_shift_window": false
+  }
+}

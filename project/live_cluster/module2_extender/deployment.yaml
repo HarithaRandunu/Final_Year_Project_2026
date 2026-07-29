@@ -1,0 +1,91 @@
+# Module 2's live port (Phase 5): RBAC to list pods cluster-wide (to spot
+# new placements) and read node specs/metrics (to compute reward), plus
+# the extender service itself. Wiring this into kube-scheduler's actual
+# config is a separate, deliberately careful step - see
+# scheduler-extender-config.yaml and the notes in Progress_Trace.md.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: module2-extender
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: module2-extender
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: module2-extender
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: module2-extender
+subjects:
+  - kind: ServiceAccount
+    name: module2-extender
+    namespace: default
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: module2-extender
+  labels:
+    app: module2-extender
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: module2-extender
+  template:
+    metadata:
+      labels:
+        app: module2-extender
+    spec:
+      serviceAccountName: module2-extender
+      containers:
+        - name: module2-extender
+          image: module2-extender:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8090
+          env:
+            - name: DISCOUNT_GAMMA
+              value: "0.9"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8090
+            initialDelaySeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8090
+            initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: module2-extender
+  labels:
+    app: module2-extender
+spec:
+  ports:
+    - port: 8090
+      protocol: TCP
+  selector:
+    app: module2-extender
