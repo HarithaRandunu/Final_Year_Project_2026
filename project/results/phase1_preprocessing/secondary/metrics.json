@@ -1,0 +1,58 @@
+{
+  "msname": "9a3ef4d24dd4e7fb8baaa9e30aea1395caa50f583630f69047c8e20f2e8d9554",
+  "tag": "secondary",
+  "bucket_seconds": 120,
+  "violation_percentile": 0.9,
+  "train_frac": 0.75,
+  "output_paths": {
+    "full": "C:\\Users\\randu\\OneDrive\\Desktop\\Campus\\FYP\\implementation\\project\\data\\processed\\features_secondary.parquet",
+    "train": "C:\\Users\\randu\\OneDrive\\Desktop\\Campus\\FYP\\implementation\\project\\data\\processed\\features_secondary_train.parquet",
+    "test": "C:\\Users\\randu\\OneDrive\\Desktop\\Campus\\FYP\\implementation\\project\\data\\processed\\features_secondary_test.parquet"
+  },
+  "sanity_checks": {
+    "row_count": 360,
+    "column_count": 37,
+    "na_counts_nonzero": {
+      "p95_latency_ms_delta1": 1,
+      "p99_latency_ms_delta1": 1,
+      "HTTP_MCR_delta1": 1,
+      "HTTP_RT_delta1": 1,
+      "providerRPC_MCR_delta1": 1,
+      "providerRPC_RT_delta1": 1,
+      "cpu_utilization_delta1": 1,
+      "memory_utilization_delta1": 1,
+      "p95_latency_ms_delta2": 2,
+      "p99_latency_ms_delta2": 2,
+      "HTTP_MCR_delta2": 2,
+      "HTTP_RT_delta2": 2,
+      "providerRPC_MCR_delta2": 2,
+      "providerRPC_RT_delta2": 2,
+      "cpu_utilization_delta2": 2,
+      "memory_utilization_delta2": 2,
+      "p95_latency_ms_delta4": 4,
+      "p99_latency_ms_delta4": 4,
+      "HTTP_MCR_delta4": 4,
+      "HTTP_RT_delta4": 4,
+      "providerRPC_MCR_delta4": 4,
+      "providerRPC_RT_delta4": 4,
+      "cpu_utilization_delta4": 4,
+      "memory_utilization_delta4": 4
+    },
+    "label_mean_overall": 0.1,
+    "label_mean_train": 0.04814814814814815,
+    "label_mean_test": 0.25555555555555554,
+    "violation_threshold_p99_ms": 237.0,
+    "call_count_describe": {
+      "count": 360.0,
+      "mean": 13079.538888888888,
+      "std": 3936.6274338322883,
+      "min": 8043.0,
+      "25%": 10987.0,
+      "50%": 12146.5,
+      "75%": 13504.5,
+      "max": 30449.0
+    },
+    "train_rows": 270,
+    "test_rows": 90
+  }
+}
