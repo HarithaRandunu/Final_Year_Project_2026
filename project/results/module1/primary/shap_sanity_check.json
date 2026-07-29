@@ -1,0 +1,79 @@
+{
+  "per_signal": [
+    {
+      "signal": "p99_latency_ms",
+      "family_perturbed": [
+        "p99_latency_ms",
+        "p99_latency_ms_delta1",
+        "p99_latency_ms_delta2",
+        "p99_latency_ms_delta4"
+      ],
+      "baseline_risk": 0.015165242882126373,
+      "perturbed_risk": 0.1310690508531983,
+      "risk_increased": true,
+      "family_shap_baseline": 1.0416302470568057,
+      "family_shap_perturbed": 1.3688363008730662,
+      "family_rank_by_shap": 1,
+      "dominant_feature_overall": "p99_latency_ms",
+      "correctly_attributed": true,
+      "pass": true
+    },
+    {
+      "signal": "cpu_utilization",
+      "family_perturbed": [
+        "cpu_utilization",
+        "cpu_utilization_delta1",
+        "cpu_utilization_delta2",
+        "cpu_utilization_delta4"
+      ],
+      "baseline_risk": 0.015165242882126373,
+      "perturbed_risk": 0.021279649577145364,
+      "risk_increased": true,
+      "family_shap_baseline": 0.33159185990315576,
+      "family_shap_perturbed": 1.0433768716549934,
+      "family_rank_by_shap": 1,
+      "dominant_feature_overall": "p99_latency_ms",
+      "correctly_attributed": true,
+      "pass": true
+    },
+    {
+      "signal": "providerRPC_MCR",
+      "family_perturbed": [
+        "providerRPC_MCR",
+        "providerRPC_MCR_delta1",
+        "providerRPC_MCR_delta2",
+        "providerRPC_MCR_delta4"
+      ],
+      "baseline_risk": 0.015165242882126373,
+      "perturbed_risk": 0.0608340861994979,
+      "risk_increased": true,
+      "family_shap_baseline": 0.4157147811620367,
+      "family_shap_perturbed": 1.871612082881424,
+      "family_rank_by_shap": 1,
+      "dominant_feature_overall": "providerRPC_MCR_delta4",
+      "correctly_attributed": true,
+      "pass": true
+    },
+    {
+      "signal": "memory_utilization",
+      "family_perturbed": [
+        "memory_utilization",
+        "memory_utilization_delta1",
+        "memory_utilization_delta2",
+        "memory_utilization_delta4"
+      ],
+      "baseline_risk": 0.015165242882126373,
+      "perturbed_risk": 0.010014132663508047,
+      "risk_increased": false,
+      "family_shap_baseline": 0.5383004316471685,
+      "family_shap_perturbed": 0.386412680946862,
+      "family_rank_by_shap": 3,
+      "dominant_feature_overall": "p99_latency_ms",
+      "correctly_attributed": false,
+      "pass": false
+    }
+  ],
+  "n_tested": 4,
+  "n_pass": 3,
+  "all_pass": false
+}

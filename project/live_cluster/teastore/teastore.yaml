@@ -1,0 +1,361 @@
+# TeaStore (DescartesResearch/TeaStore), adapted from the project's own
+# examples/kubernetes/teastore-clusterip.yaml. Only change from upstream:
+# added resource requests/limits to every Deployment's container, since
+# HPA's CPU-utilization target requires a request to compute a percentage
+# against (upstream ships none). Memory limits (512Mi request/1Gi limit
+# for most JVM/Tomcat services) are set higher than a first-pass guess
+# would suggest - TeaStore's services OOMKilled repeatedly at 256-384Mi
+# limits before settling around 300-550Mi actual usage at idle.
+#
+# webui/image specifically use 640Mi request / 1536Mi limit, not 512Mi/1Gi
+# - a Phase 6 capacity probe found webui idling at ~940Mi against a 1Gi
+# limit (almost no headroom) and a real OOMKill under load. This is the
+# one piece of Phase 6 work kept across the Phase 5 restart triggered by
+# the ~15.9GB-usable-RAM finding (see Full_Plan.md Section 11) - it was a
+# validated fix, not part of what made that restart necessary.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-db
+  labels:
+    app: teastore
+    run: teastore-db
+spec:
+  selector:
+    matchLabels:
+      app: teastore
+      run: teastore-db
+  template:
+    metadata:
+      labels:
+        app: teastore
+        run: teastore-db
+    spec:
+      containers:
+        - name: teastore-db
+          image: descartesresearch/teastore-db
+          ports:
+            - containerPort: 3306
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: teastore-db
+  labels:
+    app: teastore
+    run: teastore-db
+spec:
+  ports:
+    - port: 3306
+      protocol: TCP
+  selector:
+    run: teastore-db
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-registry
+  labels:
+    app: teastore
+    run: teastore-registry
+spec:
+  selector:
+    matchLabels:
+      app: teastore
+      run: teastore-registry
+  template:
+    metadata:
+      labels:
+        app: teastore
+        run: teastore-registry
+    spec:
+      containers:
+        - name: teastore-registry
+          image: descartesresearch/teastore-registry
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: teastore-registry
+  labels:
+    app: teastore
+    run: teastore-registry
+spec:
+  ports:
+    - port: 8080
+      protocol: TCP
+  selector:
+    run: teastore-registry
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-persistence
+  labels:
+    app: teastore
+    run: teastore-persistence
+spec:
+  selector:
+    matchLabels:
+      app: teastore
+      run: teastore-persistence
+  template:
+    metadata:
+      labels:
+        app: teastore
+        run: teastore-persistence
+    spec:
+      containers:
+        - name: teastore-persistence
+          image: descartesresearch/teastore-persistence
+          ports:
+            - containerPort: 8080
+          env:
+            - name: HOST_NAME
+              value: "teastore-persistence"
+            - name: REGISTRY_HOST
+              value: "teastore-registry"
+            - name: DB_HOST
+              value: "teastore-db"
+            - name: DB_PORT
+              value: "3306"
+          resources:
+            requests:
+              cpu: 150m
+              memory: 512Mi
+            limits:
+              cpu: 400m
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: teastore-persistence
+  labels:
+    app: teastore
+    run: teastore-persistence
+spec:
+  ports:
+    - port: 8080
+      protocol: TCP
+  selector:
+    run: teastore-persistence
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-auth
+  labels:
+    app: teastore
+    run: teastore-auth
+spec:
+  selector:
+    matchLabels:
+      app: teastore
+      run: teastore-auth
+  template:
+    metadata:
+      labels:
+        app: teastore
+        run: teastore-auth
+    spec:
+      containers:
+        - name: teastore-auth
+          image: descartesresearch/teastore-auth
+          ports:
+            - containerPort: 8080
+          env:
+            - name: HOST_NAME
+              value: "teastore-auth"
+            - name: REGISTRY_HOST
+              value: "teastore-registry"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 300m
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: teastore-auth
+  labels:
+    app: teastore
+    run: teastore-auth
+spec:
+  ports:
+    - port: 8080
+      protocol: TCP
+  selector:
+    run: teastore-auth
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-image
+  labels:
+    app: teastore
+    run: teastore-image
+spec:
+  selector:
+    matchLabels:
+      app: teastore
+      run: teastore-image
+  template:
+    metadata:
+      labels:
+        app: teastore
+        run: teastore-image
+    spec:
+      containers:
+        - name: teastore-image
+          image: descartesresearch/teastore-image
+          ports:
+            - containerPort: 8080
+          env:
+            - name: HOST_NAME
+              value: "teastore-image"
+            - name: REGISTRY_HOST
+              value: "teastore-registry"
+          resources:
+            requests:
+              cpu: 150m
+              memory: 640Mi
+            limits:
+              cpu: 500m
+              memory: 1536Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: teastore-image
+  labels:
+    app: teastore
+    run: teastore-image
+spec:
+  ports:
+    - port: 8080
+      protocol: TCP
+  selector:
+    run: teastore-image
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-recommender
+  labels:
+    app: teastore
+    run: teastore-recommender
+spec:
+  selector:
+    matchLabels:
+      app: teastore
+      run: teastore-recommender
+  template:
+    metadata:
+      labels:
+        app: teastore
+        run: teastore-recommender
+    spec:
+      containers:
+        - name: teastore-recommender
+          image: descartesresearch/teastore-recommender
+          ports:
+            - containerPort: 8080
+          env:
+            - name: HOST_NAME
+              value: "teastore-recommender"
+            - name: REGISTRY_HOST
+              value: "teastore-registry"
+          resources:
+            requests:
+              cpu: 150m
+              memory: 512Mi
+            limits:
+              cpu: 400m
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: teastore-recommender
+  labels:
+    app: teastore
+    run: teastore-recommender
+spec:
+  ports:
+    - port: 8080
+      protocol: TCP
+  selector:
+    run: teastore-recommender
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teastore-webui
+  labels:
+    app: teastore
+    run: teastore-webui
+spec:
+  selector:
+    matchLabels:
+      app: teastore
+      run: teastore-webui
+  template:
+    metadata:
+      labels:
+        app: teastore
+        run: teastore-webui
+    spec:
+      containers:
+        - name: teastore-webui
+          image: descartesresearch/teastore-webui
+          ports:
+            - containerPort: 8080
+          env:
+            - name: HOST_NAME
+              value: "teastore-webui"
+            - name: REGISTRY_HOST
+              value: "teastore-registry"
+          resources:
+            requests:
+              cpu: 150m
+              memory: 640Mi
+            limits:
+              cpu: 500m
+              memory: 1536Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: teastore-webui
+  labels:
+    app: teastore
+    run: teastore-webui
+spec:
+  type: NodePort
+  ports:
+    - port: 8080
+      nodePort: 30080
+      protocol: TCP
+  selector:
+    run: teastore-webui

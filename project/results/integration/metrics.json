@@ -1,0 +1,30 @@
+{
+  "tag": "primary",
+  "decision_log_path": "C:\\Users\\randu\\OneDrive\\Desktop\\Campus\\FYP\\implementation\\project\\data\\processed\\module1_full_trace_primary.parquet",
+  "placement_log_path": "C:\\Users\\randu\\OneDrive\\Desktop\\Campus\\FYP\\implementation\\project\\data\\processed\\module2_decision_log_primary.parquet",
+  "parameter_trajectory_path": "C:\\Users\\randu\\OneDrive\\Desktop\\Campus\\FYP\\implementation\\project\\data\\processed\\module3_trajectory_primary.parquet",
+  "coherence_checks": {
+    "decision_log_rows": 360,
+    "decision_log_covers_full_trace": true,
+    "decision_log_no_nans": true,
+    "decision_log_risk_in_bounds": true,
+    "placement_log_rows": 87,
+    "placement_log_context_matched": true,
+    "placement_log_rewards_in_bounds": true,
+    "trajectory_rows": 360,
+    "trajectory_covers_full_trace": true,
+    "trajectory_no_nans": true,
+    "trajectory_threshold_bounded": true,
+    "m1_m3_predicted_risk_consistent": true,
+    "trajectory_alert_flag_consistent": true,
+    "all_checks_passed": true
+  },
+  "summary_stats": {
+    "n_buckets": 360,
+    "n_placement_rounds": 87,
+    "n_alerts": 102,
+    "mean_predicted_risk": 0.1168571083312731,
+    "mean_placement_reward": 0.31782671082862385,
+    "final_threshold": 0.9
+  }
+}

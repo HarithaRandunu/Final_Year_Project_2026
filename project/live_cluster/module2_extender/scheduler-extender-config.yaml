@@ -1,0 +1,15 @@
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: /etc/kubernetes/scheduler.conf
+leaderElection:
+  leaderElect: true
+extenders:
+  - urlPrefix: "http://10.96.246.32:8090"
+    filterVerb: "filter"
+    prioritizeVerb: "prioritize"
+    weight: 1
+    enableHTTPS: false
+    nodeCacheCapable: false
+    ignorable: true
+    httpTimeout: 5s

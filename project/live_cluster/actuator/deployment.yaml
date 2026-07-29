@@ -1,0 +1,87 @@
+# Phase 6's actuator (see docs/Phase6_Ablation_Design.md Section 3).
+# Starts at replicas: 0 deliberately - it's only scaled to 1 (with the
+# right ARM env var set) for the m1_only/m3_only/full arms; baseline and
+# m2_only leave HPA/KEDA in sole control and this stays at 0.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: actuator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: actuator
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: actuator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: actuator
+subjects:
+  - kind: ServiceAccount
+    name: actuator
+    namespace: default
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: actuator
+  labels:
+    app: actuator
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: actuator
+  template:
+    metadata:
+      labels:
+        app: actuator
+    spec:
+      serviceAccountName: actuator
+      containers:
+        - name: actuator
+          image: actuator:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8092
+          env:
+            - name: ARM
+              value: "m1_only"
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8092
+            initialDelaySeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8092
+            initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: actuator
+  labels:
+    app: actuator
+spec:
+  ports:
+    - port: 8092
+      protocol: TCP
+  selector:
+    app: actuator

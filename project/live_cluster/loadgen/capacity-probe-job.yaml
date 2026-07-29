@@ -1,0 +1,42 @@
+# Runs capacity_probe.js in-cluster via the grafana/k6 image, so load
+# originates from inside the cluster (no host-side network variable) -
+# see docs/Phase6_Ablation_Design.md Section 4. One-shot Job, not a
+# Deployment - delete/recreate per run.
+#
+# The ConfigMap holding the script is created separately, straight from
+# capacity_probe.js, so the script is edited in one place, not duplicated
+# into YAML:
+#   kubectl create configmap capacity-probe-script \
+#     --from-file=capacity_probe.js=./capacity_probe.js
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: capacity-probe
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      containers:
+        - name: k6
+          image: grafana/k6:latest
+          args: ["run", "/scripts/capacity_probe.js"]
+          env:
+            - name: TARGET_URL
+              value: "http://teastore-webui:8080/tools.descartes.teastore.webui/"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 128Mi
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+      volumes:
+        - name: script
+          configMap:
+            name: capacity-probe-script

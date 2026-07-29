@@ -1,0 +1,32 @@
+# maxReplicaCount: 2, not 3 - see hpa-baseline.yaml's note. This is an
+# alternative arm to hpa-baseline.yaml (same scaleTargetRefs) - the two
+# aren't applied simultaneously.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: teastore-webui-keda
+spec:
+  scaleTargetRef:
+    name: teastore-webui
+  minReplicaCount: 1
+  maxReplicaCount: 2
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "50"
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: teastore-image-keda
+spec:
+  scaleTargetRef:
+    name: teastore-image
+  minReplicaCount: 1
+  maxReplicaCount: 2
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "50"

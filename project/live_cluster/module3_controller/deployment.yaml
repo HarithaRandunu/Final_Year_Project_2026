@@ -1,0 +1,57 @@
+# Module 3's live port (Phase 5): no K8s API access needed - it only talks
+# to Module 1's and Module 2's own HTTP endpoints (in-cluster Service DNS),
+# so no RBAC beyond default is required.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: module3-controller
+  labels:
+    app: module3-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: module3-controller
+  template:
+    metadata:
+      labels:
+        app: module3-controller
+    spec:
+      containers:
+        - name: module3-controller
+          image: module3-controller:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8091
+          env:
+            - name: POLL_SECONDS
+              value: "120"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8091
+            initialDelaySeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8091
+            initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: module3-controller
+  labels:
+    app: module3-controller
+spec:
+  ports:
+    - port: 8091
+  selector:
+    app: module3-controller

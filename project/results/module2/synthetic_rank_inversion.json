@@ -1,0 +1,44 @@
+{
+  "gamma_discounted": 0.9,
+  "gamma_vanilla": 1.0,
+  "n_arms": 6,
+  "rounds_per_phase": 150,
+  "recovery_window_rounds": 30,
+  "n_repeats": 50,
+  "phase1_means": [
+    0.85,
+    0.7,
+    0.55,
+    0.4,
+    0.25,
+    0.1
+  ],
+  "phase2_means": [
+    0.1,
+    0.25,
+    0.4,
+    0.55,
+    0.7,
+    0.85
+  ],
+  "recovery_window": {
+    "discounted_mean": 0.3635295136992163,
+    "vanilla_mean": 0.180513967277596,
+    "win_rate_discounted": 1.0,
+    "mean_diff": 0.18301554642162046,
+    "wilcoxon_statistic": 1275.0,
+    "wilcoxon_pvalue_one_sided_greater": 8.881784197001252e-16
+  },
+  "post_inversion_full_phase": {
+    "discounted_mean": 0.6574676770568019,
+    "vanilla_mean": 0.46024138015546745,
+    "win_rate_discounted": 0.98,
+    "mean_diff": 0.19722629690133434,
+    "wilcoxon_statistic": 1274.0,
+    "wilcoxon_pvalue_one_sided_greater": 1.7763568394002505e-15
+  },
+  "pass_criteria": {
+    "discounted_beats_vanilla_recovery_window": true,
+    "discounted_beats_vanilla_full_post_inversion": true
+  }
+}
