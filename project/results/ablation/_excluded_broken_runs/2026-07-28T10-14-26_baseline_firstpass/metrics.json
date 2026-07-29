@@ -1,0 +1,162 @@
+{
+  "run_id": "2026-07-28T10-14-26_baseline_firstpass",
+  "arm": "baseline",
+  "workload_type": "alibaba_replay_primary",
+  "run_tag": "firstpass",
+  "start_time": "2026-07-28T10:15:16.497211+00:00",
+  "end_time": "2026-07-28T10:15:49.904864+00:00",
+  "aborted": false,
+  "abort_reason": null,
+  "sla_violation_count": 0,
+  "sla_violation_duration_s": 0,
+  "p95_latency_ms": null,
+  "p99_latency_ms": null,
+  "replica_trajectory": [
+    {
+      "t": "2026-07-28T10:15:18.116746+00:00",
+      "replicas": 2
+    },
+    {
+      "t": "2026-07-28T10:15:49.678647+00:00",
+      "replicas": 2
+    }
+  ],
+  "cost_proxy_pod_seconds": 120,
+  "elasticity": {
+    "instability_reversals": 0,
+    "deviation_std": 0.0,
+    "over_provisioning_timeshare": 0.0,
+    "under_provisioning_timeshare": 0.0
+  },
+  "module1_predicted_risk_trace": [
+    null,
+    null
+  ],
+  "module3_threshold_trace": [
+    0.1,
+    0.1
+  ],
+  "k6_stages": [
+    {
+      "target": 14.67,
+      "duration": "30s"
+    },
+    {
+      "target": 14.48,
+      "duration": "30s"
+    },
+    {
+      "target": 17.59,
+      "duration": "30s"
+    },
+    {
+      "target": 16.92,
+      "duration": "30s"
+    },
+    {
+      "target": 16.15,
+      "duration": "30s"
+    },
+    {
+      "target": 21.79,
+      "duration": "30s"
+    },
+    {
+      "target": 21.82,
+      "duration": "30s"
+    },
+    {
+      "target": 21.76,
+      "duration": "30s"
+    },
+    {
+      "target": 21.51,
+      "duration": "30s"
+    },
+    {
+      "target": 22.62,
+      "duration": "30s"
+    },
+    {
+      "target": 18.78,
+      "duration": "30s"
+    },
+    {
+      "target": 14.58,
+      "duration": "30s"
+    },
+    {
+      "target": 14.48,
+      "duration": "30s"
+    },
+    {
+      "target": 15.78,
+      "duration": "30s"
+    },
+    {
+      "target": 17.33,
+      "duration": "30s"
+    },
+    {
+      "target": 19.51,
+      "duration": "30s"
+    },
+    {
+      "target": 19.64,
+      "duration": "30s"
+    },
+    {
+      "target": 18.44,
+      "duration": "30s"
+    },
+    {
+      "target": 16.63,
+      "duration": "30s"
+    },
+    {
+      "target": 15.86,
+      "duration": "30s"
+    },
+    {
+      "target": 16.67,
+      "duration": "30s"
+    },
+    {
+      "target": 14.62,
+      "duration": "30s"
+    },
+    {
+      "target": 12.14,
+      "duration": "30s"
+    },
+    {
+      "target": 9.09,
+      "duration": "30s"
+    },
+    {
+      "target": 8.64,
+      "duration": "30s"
+    },
+    {
+      "target": 8.0,
+      "duration": "30s"
+    },
+    {
+      "target": 9.03,
+      "duration": "30s"
+    },
+    {
+      "target": 16.44,
+      "duration": "30s"
+    },
+    {
+      "target": 18.32,
+      "duration": "30s"
+    },
+    {
+      "target": 24.0,
+      "duration": "30s"
+    }
+  ],
+  "notes": "p95/p99 latency figures come from Module 1's own active HTTP probing (not k6's client-side timing) - the same signal Module 1's risk model consumes, kept consistent with how Phase 5's controllers already measure latency. sla_violation_duration_s/cost_proxy_pod_seconds are computed from the 30s poll interval, an approximation not a precise integral."
+}

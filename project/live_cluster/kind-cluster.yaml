@@ -1,0 +1,16 @@
+# Phase 5, third attempt - sized against the true ~15.9GB usable RAM
+# ceiling (see docs/Full_Plan_MultiSignal_Autoscaling.md Section 11), not
+# the nameplate 23.4GB. 2 nodes, not 3: KinD's control-plane node is
+# tainted/unschedulable by default, which meant the previous 3-node
+# attempt's Module 2 scheduler-extender only ever had 2 real scheduling
+# choices (the 2 workers) anyway - the control-plane's own overhead bought
+# nothing. Here the control-plane's default taint is removed after
+# creation (see setup notes) so it becomes the second schedulable node,
+# giving Module 2 the same 2-way real placement choice for one fewer
+# node's baseline kubelet/containerd/kube-proxy overhead.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: fyp-autoscaling
+nodes:
+  - role: control-plane
+  - role: worker

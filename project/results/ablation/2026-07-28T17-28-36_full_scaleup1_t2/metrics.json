@@ -1,0 +1,332 @@
+{
+  "run_id": "2026-07-28T17-28-36_full_scaleup1_t2",
+  "arm": "full",
+  "workload_type": "alibaba_replay_primary",
+  "run_tag": "scaleup1_t2",
+  "start_time": "2026-07-28T17:29:27.553184+00:00",
+  "end_time": "2026-07-28T17:44:43.487713+00:00",
+  "aborted": false,
+  "abort_reason": null,
+  "scheduler_swapped": false,
+  "warmup_samples_excluded": 0,
+  "sla_violation_count": 0,
+  "sla_violation_duration_s": 0,
+  "p95_latency_ms": 361.53891200228827,
+  "p99_latency_ms": 361.53891200228827,
+  "replica_trajectory": [
+    {
+      "t": "2026-07-28T17:29:28.804152+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:30:00.329034+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:30:31.875626+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:31:03.403438+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:31:34.936726+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:32:06.512423+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:32:38.043315+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:33:09.586706+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:33:41.116912+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:34:12.664351+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:34:44.203805+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:35:15.747831+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:35:47.275908+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:36:18.818750+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:36:50.335344+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:37:21.877975+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:37:53.418883+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:38:24.971855+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:38:56.525625+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:39:28.054949+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:39:59.586998+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:40:31.099583+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:41:02.624617+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:41:34.150980+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:42:05.676605+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:42:37.202795+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:43:08.724193+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:43:40.226955+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:44:11.734302+00:00",
+      "replicas": 1
+    },
+    {
+      "t": "2026-07-28T17:44:43.275364+00:00",
+      "replicas": 1
+    }
+  ],
+  "cost_proxy_pod_seconds": 900,
+  "elasticity": {
+    "instability_reversals": 0,
+    "deviation_std": 0.0,
+    "over_provisioning_timeshare": 0.0,
+    "under_provisioning_timeshare": 0.0
+  },
+  "module1_predicted_risk_trace": [
+    null,
+    null,
+    null,
+    0.006297041569967572,
+    0.006297041569967572,
+    0.006297041569967572,
+    0.006297041569967572,
+    0.010157477572375463,
+    0.010157477572375463,
+    0.010157477572375463,
+    0.004212671578338097,
+    0.004212671578338097,
+    0.004212671578338097,
+    0.004212671578338097,
+    0.06210816057345864,
+    0.06210816057345864,
+    0.06210816057345864,
+    0.06210816057345864,
+    0.04910018317759555,
+    0.04910018317759555,
+    0.04910018317759555,
+    0.04910018317759555,
+    0.0025159373798387826,
+    0.0025159373798387826,
+    0.0025159373798387826,
+    0.0025159373798387826,
+    0.04635649666635003,
+    0.04635649666635003,
+    0.04635649666635003,
+    0.012287555755629932
+  ],
+  "module3_threshold_trace": [
+    0.1,
+    0.1,
+    0.1,
+    0.1125,
+    0.1125,
+    0.1125,
+    0.1125,
+    0.1577800166810976,
+    0.1577800166810976,
+    0.1577800166810976,
+    0.20344830995615665,
+    0.20344830995615665,
+    0.20344830995615665,
+    0.20344830995615665,
+    0.24943490510097266,
+    0.24943490510097266,
+    0.24943490510097266,
+    0.24943490510097266,
+    0.29583071196822086,
+    0.29583071196822086,
+    0.29583071196822086,
+    0.29583071196822086,
+    0.33887111718270635,
+    0.33887111718270635,
+    0.33887111718270635,
+    0.33887111718270635,
+    0.3815800633336649,
+    0.3815800633336649,
+    0.3815800633336649,
+    0.4244461856769409
+  ],
+  "k6_stages": [
+    {
+      "target": 15,
+      "duration": "30s"
+    },
+    {
+      "target": 14,
+      "duration": "30s"
+    },
+    {
+      "target": 18,
+      "duration": "30s"
+    },
+    {
+      "target": 17,
+      "duration": "30s"
+    },
+    {
+      "target": 16,
+      "duration": "30s"
+    },
+    {
+      "target": 22,
+      "duration": "30s"
+    },
+    {
+      "target": 22,
+      "duration": "30s"
+    },
+    {
+      "target": 22,
+      "duration": "30s"
+    },
+    {
+      "target": 22,
+      "duration": "30s"
+    },
+    {
+      "target": 23,
+      "duration": "30s"
+    },
+    {
+      "target": 19,
+      "duration": "30s"
+    },
+    {
+      "target": 15,
+      "duration": "30s"
+    },
+    {
+      "target": 14,
+      "duration": "30s"
+    },
+    {
+      "target": 16,
+      "duration": "30s"
+    },
+    {
+      "target": 17,
+      "duration": "30s"
+    },
+    {
+      "target": 20,
+      "duration": "30s"
+    },
+    {
+      "target": 20,
+      "duration": "30s"
+    },
+    {
+      "target": 18,
+      "duration": "30s"
+    },
+    {
+      "target": 17,
+      "duration": "30s"
+    },
+    {
+      "target": 16,
+      "duration": "30s"
+    },
+    {
+      "target": 17,
+      "duration": "30s"
+    },
+    {
+      "target": 15,
+      "duration": "30s"
+    },
+    {
+      "target": 12,
+      "duration": "30s"
+    },
+    {
+      "target": 9,
+      "duration": "30s"
+    },
+    {
+      "target": 9,
+      "duration": "30s"
+    },
+    {
+      "target": 8,
+      "duration": "30s"
+    },
+    {
+      "target": 9,
+      "duration": "30s"
+    },
+    {
+      "target": 16,
+      "duration": "30s"
+    },
+    {
+      "target": 18,
+      "duration": "30s"
+    },
+    {
+      "target": 24,
+      "duration": "30s"
+    }
+  ],
+  "notes": "p95/p99 latency figures come from Module 1's own active HTTP probing (not k6's client-side timing) - the same signal Module 1's risk model consumes, kept consistent with how Phase 5's controllers already measure latency. sla_violation_duration_s is computed from the 30s poll interval, an approximation not a precise integral. cost_proxy_pod_seconds/replica_trajectory cover the FULL trial (real cost incurred, not censored); p95/p99/sla_violation_count/elasticity exclude the first 0 sample(s) when scheduler_swapped=true, since the first-pass ablation found a real cold-start latency spike right after a scheduler swap that isn't representative of steady-state behavior (see docs/Progress_Trace_MultiSignal_Autoscaling.md's Phase 6 section)."
+}
