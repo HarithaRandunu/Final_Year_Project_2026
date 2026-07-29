@@ -238,13 +238,18 @@ Attempt 1 (15.4GB RAM, 4-node cluster) hit severe host-wide memory exhaustion, f
 
 *Not required for the core deliverable — does not block final submission. See Full_Plan.md §13 and Phase_Plan.md's Phase 8 for the full spec. Only start this after Phase 7 is genuinely done.*
 
+**Planned 2026-07-29** (not yet built — this is the agreed plan, logged before implementation starts):
+
 | Task | Owner | Status | Started | Completed | Notes |
 |---|---|---|---|---|---|
-| Confirm structured result artifacts exist from Phases 2/3/6 | Unassigned | Not Started | | | Should already exist if those phases were followed as written — nothing new to build here if so |
-| Build Streamlit training-results view | Unassigned | Not Started | | | |
-| Build Streamlit test/ablation-results view | Unassigned | Not Started | | | |
-| Build Tier 1 live "what-if" panel | Unassigned | Not Started | | | Calls each module's decide-now function directly (Full_Plan.md §13.2) |
-| Tier 2 full live replay | Unassigned | Not Started | | | Stretch only — skip if time is short |
+| Confirm structured result artifacts exist from Phases 2/3/6 | Unassigned | **Done** | 2026-07-29 | 2026-07-29 | Confirmed during planning: §13.2 habit 1 (structured JSON/PNG output, not console-only) is fully satisfied everywhere — nothing new needed. |
+| ⚠️ Gap found: add decide-now functions to Modules 2 & 3 | Unassigned | Not Started | | | §13.2 habit 2 is only half-done — `module1_signal_fusion/common.py::predict_risk()` exists, but Module 2/3 only expose stateful class methods (`ThompsonSamplingBandit.select()`, `PIController.step()`), not standalone functions. Needed before the what-if panel can be built: `select_node(candidates, context)` in `module2_co_scheduling/common.py`, `adjust_params(predicted_risk, actual_outcome)` in `module3_adaptive_control/common.py`, each reconstructing realistic accumulated state by replaying already-validated historical data once at app startup (reusing existing tested logic, not new decision logic). |
+| Build Streamlit training-results view | Unassigned | Not Started | | | `project/dashboard/pages/1_Training_Results.py` — reads `results/module{1,2,3}/*.json` + existing PNGs directly. |
+| Build Streamlit test/ablation-results view | Unassigned | Not Started | | | `project/dashboard/pages/2_Ablation_Results.py` — reads `results/phase7/*.json` + `trial_level_data.csv`. |
+| Build Tier 1 live "what-if" panel | Unassigned | Not Started | | | `project/dashboard/pages/3_Live_WhatIf.py`. **Decided 2026-07-29: fully offline**, not dependent on the live KinD cluster being up — avoids re-introducing the host-memory risk Phase 5 fought hard to eliminate. Calls each module's decide-now function directly (Full_Plan.md §13.2). |
+| Tier 2 full live replay | Unassigned | **Descoped 2026-07-29** | | | Decided: Tier 1 only, per the original spec's own guidance. Not attempted unless explicitly revisited later. |
+
+**Branch strategy (decided 2026-07-29):** built on a new `phase8-dashboard` branch off `main`, not directly on `main` — keeps the graded core-deliverable history untouched while this optional, unassigned phase is developed. Merge into `main` later only if/when it's actually finished.
 
 ---
 

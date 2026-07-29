@@ -200,15 +200,18 @@ Run 1c–1l once for the primary `msname`, then again for the second one (1a′)
 **Entry criteria:** Phase 7 complete — real results exist to display. Do not start this before then, and do not let it delay Phase 7.
 
 **Tasks:**
-- Confirm the structured result artifacts from Phases 2, 3, and 6 are actually present and complete (they should already exist if those phases' tasks were followed as written)
+- ~~Confirm the structured result artifacts from Phases 2, 3, and 6 are actually present and complete~~ **Done 2026-07-29** — confirmed during planning, nothing new needed.
+- **Gap found during planning (2026-07-29):** `predict_risk` exists (Module 1), but Module 2/3 only expose stateful class methods, not standalone decide-now functions. Add `select_node()` to `module2_co_scheduling/common.py` and `adjust_params()` to `module3_adaptive_control/common.py` first — each reconstructs realistic state by replaying already-validated historical data at app startup.
 - Build the Streamlit training-results view
 - Build the Streamlit test/ablation-results view
-- Build the Tier 1 live "what-if" panel, calling each module's `predict_risk` / `select_node` / `adjust_params` function directly (Full_Plan.md §13.2)
-- Stretch, only if time remains: Tier 2 full live replay
+- Build the Tier 1 live "what-if" panel, calling each module's `predict_risk` / `select_node` / `adjust_params` function directly (Full_Plan.md §13.2). **Decided 2026-07-29: fully offline**, not dependent on the live KinD cluster — avoids re-introducing the host-memory risk Phase 5 eliminated.
+- ~~Stretch, only if time remains: Tier 2 full live replay~~ **Descoped 2026-07-29** — Tier 1 only, per the plan agreed with the user.
 
 **Exit criteria:** a locally runnable dashboard showing real training and ablation results, plus a working live single-decision check. This phase can be abandoned at any point without affecting the core deliverable or the report.
 
 **Owner:** unassigned — whoever has time after Phase 7, or split opportunistically. Explicitly not on any module owner's critical path.
+
+**Branch strategy (decided 2026-07-29):** a new `phase8-dashboard` branch off `main`, not directly on `main` — see `Progress_Trace_MultiSignal_Autoscaling.md`'s Phase 8 section for the full plan.
 
 ---
 
