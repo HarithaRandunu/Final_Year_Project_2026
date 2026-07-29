@@ -26,7 +26,53 @@ def load_json(path: Path) -> dict | None:
         return json.load(f)
 
 
-tab1, tab2, tab3 = st.tabs(["Module 1 — Signal Fusion", "Module 2 — Co-Scheduling", "Module 3 — Adaptive Control"])
+tab0, tab1, tab2, tab3 = st.tabs([
+    "\U0001F517 Integration (Full Framework)", "Module 1 — Signal Fusion",
+    "Module 2 — Co-Scheduling", "Module 3 — Adaptive Control",
+])
+
+# --- Integration (Phase 4: simulated closed loop) ---
+with tab0:
+    st.markdown(
+        "**Phase 4** wires all three already-validated modules together — Module 1's predicted_risk "
+        "feeding both Module 2 (as placement context) and Module 3 (as the adaptive-control input) — "
+        "and checks the result for mutual consistency. This is the project's own solution as one system, "
+        "not three modules validated in isolation."
+    )
+    int_dir = RESULTS_DIR / "integration"
+    integ = load_json(int_dir / "metrics.json")
+    if integ is None:
+        st.warning(f"No results found at {int_dir}/metrics.json")
+    else:
+        checks = integ["coherence_checks"]
+        st.subheader("Coherence checks")
+        st.write(f"Overall: {pass_badge(checks['all_checks_passed'])} — all 13 checks below")
+        check_rows = [{"Check": k, "Passed": "✅" if v is True else ("—" if isinstance(v, int) else "❌")}
+                      for k, v in checks.items() if isinstance(v, bool)]
+        st.dataframe(check_rows, use_container_width=True, hide_index=True)
+
+        st.subheader("Summary")
+        stats = integ["summary_stats"]
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Buckets covered", stats["n_buckets"])
+        c1.metric("Placement rounds", stats["n_placement_rounds"])
+        c2.metric("Alerts raised (M3)", stats["n_alerts"])
+        c2.metric("Mean predicted_risk (M1)", f"{stats['mean_predicted_risk']:.4f}")
+        c3.metric("Mean placement reward (M2)", f"{stats['mean_placement_reward']:.4f}")
+        c3.metric("Final threshold (M3)", f"{stats['final_threshold']:.3f}")
+
+        overview = int_dir / "closed_loop_overview.png"
+        if overview.exists():
+            st.image(str(overview), caption="Closed-loop overview: predicted_risk, placement, threshold trajectory", use_container_width=True)
+
+        st.caption(
+            "This is Phase 4's simulated integration, not the live 25-trial ablation (Phase 6) — see the "
+            "Ablation Results page for the live study, where the **full** arm is this same combined system "
+            "measured against baseline/HPA and each module in isolation."
+        )
+
+        with st.expander("Raw metrics.json"):
+            st.json(integ)
 
 # --- Module 1 ---
 with tab1:

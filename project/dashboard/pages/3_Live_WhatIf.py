@@ -45,7 +45,10 @@ st.caption(
     "calibrated model — the same function a future live controller would call, not a re-implementation."
 )
 
-tab1, tab2, tab3 = st.tabs(["Module 1 — Signal Fusion", "Module 2 — Co-Scheduling", "Module 3 — Adaptive Control"])
+tab0, tab1, tab2, tab3 = st.tabs([
+    "\U0001F517 Integration — Full Framework", "Module 1 — Signal Fusion",
+    "Module 2 — Co-Scheduling", "Module 3 — Adaptive Control",
+])
 
 # --- Module 1: predict_risk ---
 with tab1:
@@ -171,3 +174,61 @@ with tab3:
             "reversal count": result["reversal_count"],
             "covered by previous interval": result["covered_by_previous_interval"],
         }], use_container_width=True, hide_index=True)
+
+# --- Integration: full framework (written last so it can reuse tab2's
+# already-computed `candidates` list; tab0 was assigned FIRST in st.tabs()
+# above purely for visual/tab-bar position - Streamlit renders each tab's
+# content into its own container regardless of the order its `with` block
+# appears in the script, so code order here is independent of tab order. ---
+with tab0:
+    st.markdown(
+        "Chains all three modules together exactly as the live ablation's **full** arm was wired "
+        "([docs/Phase6_Ablation_Design.md](../../../docs/Phase6_Ablation_Design.md) Section 3): "
+        "Module 1's predicted_risk drives the scaling decision, Module 3's adaptively-calibrated "
+        "threshold is the threshold source (not a fixed constant), and Module 2 scores which node "
+        "would host any new replica. The actuator's own band rule is reproduced here directly — "
+        "`signal > threshold` → +1 replica, `signal < threshold * 0.5` → −1, else hold, bounded to "
+        "`[1, 2]` — not re-implemented differently."
+    )
+
+    c1, c2 = st.columns(2)
+    int_risk = c1.slider("Module 1's predicted_risk (current)", 0.0, 1.0, 0.35, key="int_risk")
+    int_outcome = c2.selectbox("Actual outcome (for Module 3's calibration)", [0.0, 1.0], index=0,
+                                format_func=lambda v: "Violation" if v == 1.0 else "No violation", key="int_outcome")
+    current_replicas = st.number_input("Current replica count", min_value=1, max_value=2, value=1, key="int_replicas")
+    st.caption("Uses the same candidate nodes selected in the Module 2 tab above for any placement decision.")
+
+    if st.button("Run Full Framework", type="primary"):
+        MIN_REPLICAS, MAX_REPLICAS = 1, 2  # matches live_cluster/actuator/app.py's defaults
+
+        m3_result = m3_common.adjust_params(int_risk, int_outcome, mode="full")
+        threshold = m3_result["new_threshold"]
+
+        if int_risk > threshold and current_replicas < MAX_REPLICAS:
+            decision, new_replicas = "\U0001F53A Scale UP (+1)", current_replicas + 1
+        elif int_risk < threshold * 0.5 and current_replicas > MIN_REPLICAS:
+            decision, new_replicas = "\U0001F53B Scale DOWN (-1)", current_replicas - 1
+        else:
+            decision, new_replicas = "⏸️ HOLD", current_replicas
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("M1 predicted_risk", f"{int_risk:.3f}")
+        c2.metric("M3 adaptive threshold", f"{threshold:.3f}")
+        c3.metric("Actuator decision", decision, f"{new_replicas} replicas")
+
+        if "UP" in decision:
+            if len(candidates) >= 2:
+                m2_result = m2_common.select_node(candidates)
+                st.success(f"Module 2 would place the new replica on: **{m2_result['chosen_node'][:16]}…**")
+                st.dataframe(
+                    [{"node": n[:16] + "…", **info} for n, info in m2_result["candidates"].items()],
+                    use_container_width=True, hide_index=True,
+                )
+            else:
+                st.warning(
+                    "Scaling up, but fewer than 2 candidate nodes are selected in the Module 2 tab — "
+                    "pick at least 2 there to see a placement decision."
+                )
+        else:
+            st.caption("No new replica to place this cycle (hold or scale-down) — Module 2 isn't invoked, "
+                       "exactly as the real actuator only calls the scheduler on a scale-up.")
