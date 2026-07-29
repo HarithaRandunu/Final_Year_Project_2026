@@ -68,3 +68,53 @@ def load_resource_rows_for_service(msname: str, data_dir: Path = DEFAULT_DATA_DI
             if not subset.empty:
                 matches.append(subset)
     return pd.concat(matches, ignore_index=True) if matches else pd.DataFrame(columns=cols)
+
+
+DEFAULT_BANDIT_STATE_PATH = DEFAULT_RESULTS_DIR / "final_bandit_state.json"
+
+
+def select_node(candidate_nodeids: list[str], state_path: Path = DEFAULT_BANDIT_STATE_PATH,
+                 gamma: float | None = None, seed: int | None = None) -> dict:
+    """Module 2's "decide right now" function (Full_Plan.md Section 13.2),
+    for the Phase 8 dashboard's what-if panel. Loads the validated
+    combined-policy bandit's final per-node posterior
+    (export_final_bandit_state.py's output - reconstructed once from the
+    real event stream, not recomputed live, so this function has zero
+    dependency on the raw dataset) and answers: given these candidate
+    nodes, which would the trained bandit pick right now?
+
+    Candidate node IDs never seen in the validated run get an
+    uninformative Beta(1,1) prior - a real, valid case (what the bandit
+    does when faced with a genuinely new node), not an error.
+    """
+    from bandit import ThompsonSamplingBandit  # local import: avoids a hard
+    # dependency on bandit.py for callers that only need config loading
+
+    with open(state_path, "r", encoding="utf-8") as f:
+        saved = json.load(f)
+
+    cfg_gamma = gamma if gamma is not None else saved["gamma"]
+    cfg_seed = seed if seed is not None else 42
+    bandit = ThompsonSamplingBandit(gamma=cfg_gamma, seed=cfg_seed)
+
+    candidate_info = {}
+    for nodeid in candidate_nodeids:
+        node_state = saved["nodes"].get(str(nodeid))
+        if node_state is not None:
+            bandit.alpha[nodeid] = node_state["alpha"]
+            bandit.beta[nodeid] = node_state["beta"]
+            bandit.pulls[nodeid] = node_state["pulls"]
+            candidate_info[nodeid] = {"seen_in_training": True, "pulls": node_state["pulls"],
+                                       "posterior_mean": node_state["posterior_mean"]}
+        else:
+            bandit._ensure_arm(nodeid)
+            candidate_info[nodeid] = {"seen_in_training": False, "pulls": 0,
+                                       "posterior_mean": bandit.posterior_mean(nodeid)}
+
+    chosen = bandit.select(candidate_nodeids)
+    return {
+        "chosen_node": chosen,
+        "candidates": candidate_info,
+        "gamma_used": cfg_gamma,
+        "n_nodes_in_training_state": saved["n_nodes"],
+    }

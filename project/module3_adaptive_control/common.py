@@ -55,6 +55,65 @@ def load_holdout_residual_stream(tag: str = "primary") -> pd.DataFrame:
     return pd.read_parquet(DEFAULT_PROCESSED_DIR / f"module1_residual_stream_{tag}.parquet")
 
 
+def adjust_params(predicted_risk: float, actual_outcome: float, cfg: "Module3Config" = None,
+                   mode: str = "full", tag: str = "primary") -> dict:
+    """Module 3's "decide right now" function (Full_Plan.md Section 13.2),
+    for the Phase 8 dashboard's what-if panel. `PIController`/
+    `AdaptiveConformalInference` are stateful - they need realistic
+    accumulated history to give a meaningful answer, not a cold-start
+    reading - so this replays the validated walk-forward out-of-sample
+    series (a small, already-committed parquet; no dependency on the raw
+    dataset) once to rebuild that state, then applies exactly one more
+    step for the given (predicted_risk, actual_outcome) pair.
+
+    mode: "full" (PI + ACI + oscillation widening, the individual
+    contribution) or "pi_conformal" (widening disabled, for comparison -
+    matches validate.py's own three-way comparison arms).
+    """
+    from conformal import AdaptiveConformalInference, oscillation_widening_factor, rolling_reversal_count
+    from pi_controller import PIController
+
+    cfg = cfg or Module3Config.load()
+    bursty = load_walkforward_oos_series(tag)
+
+    pi = PIController(cfg.kp, cfg.ki, cfg.setpoint, cfg.initial_threshold, tuple(cfg.threshold_bounds))
+    aci = AdaptiveConformalInference(cfg.alpha_target, tuple(cfg.alpha_bounds), cfg.aci_gamma, cfg.score_window)
+    trajectory = [cfg.initial_threshold]
+
+    def step(risk: float, actual: float) -> tuple[float, float, int, bool]:
+        score = abs(actual - risk)
+        width, covered = aci.update(score)
+        if mode == "full":
+            rev_count = rolling_reversal_count(trajectory, cfg.oscillation_window)
+            mult = oscillation_widening_factor(rev_count, cfg.oscillation_k)
+        else:
+            rev_count, mult = 0, 1.0
+        widened_width = width * mult
+        max_step = cfg.base_max_step / (1 + cfg.width_sensitivity * widened_width)
+        threshold = pi.step(risk, max_step)
+        trajectory.append(threshold)
+        return width, mult, rev_count, covered
+
+    for _, row in bursty.iterrows():
+        step(float(row["predicted_risk"]), float(row["actual_outcome"]))
+
+    previous_threshold = trajectory[-1]
+    width, mult, rev_count, covered = step(predicted_risk, actual_outcome)
+    new_threshold = trajectory[-1]
+
+    return {
+        "mode": mode,
+        "previous_threshold": previous_threshold,
+        "new_threshold": new_threshold,
+        "alert": bool(predicted_risk > new_threshold),
+        "conformal_width": width,
+        "widening_multiplier": mult,
+        "reversal_count": rev_count,
+        "covered_by_previous_interval": covered,
+        "n_historical_steps_replayed": len(bursty),
+    }
+
+
 def load_walkforward_oos_series(tag: str = "primary") -> pd.DataFrame:
     """A richer, still-genuinely-out-of-sample series spanning the trace's
     actual bursty plateau (Module 1's held-out test window happens to fall in

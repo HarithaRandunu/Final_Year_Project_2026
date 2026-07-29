@@ -1,0 +1,5 @@
+streamlit>=1.50
+plotly>=6.0
+pandas
+joblib
+lightgbm
