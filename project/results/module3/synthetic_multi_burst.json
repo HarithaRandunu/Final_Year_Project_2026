@@ -1,0 +1,28 @@
+{
+  "n_bursts_per_repeat": 15,
+  "n_repeats": 50,
+  "avg_rows_per_repeat": 393.48,
+  "reversal_count": {
+    "pi_conformal_mean": 14.04,
+    "full_mean": 7.64,
+    "full_strictly_lower_rate": 0.46,
+    "tie_rate": 0.5,
+    "full_strictly_higher_rate": 0.04,
+    "full_never_worse_rate": 0.96,
+    "mean_diff_pi_minus_full": 6.4,
+    "wilcoxon_statistic": 321.0,
+    "wilcoxon_pvalue_one_sided_greater": 9.809166554676721e-06
+  },
+  "deviation_std": {
+    "pi_conformal_mean": 0.025509709701320403,
+    "full_mean": 0.02391562130666793,
+    "full_lower_rate": 0.46,
+    "mean_diff_pi_minus_full": 0.001594088394652476,
+    "wilcoxon_statistic": 650.0,
+    "wilcoxon_pvalue_one_sided_greater": 0.45429891124351496
+  },
+  "pass_criteria": {
+    "full_beats_pi_conformal_instability_synthetic": true,
+    "full_beats_pi_conformal_deviation_synthetic": false
+  }
+}
