@@ -1,0 +1,21 @@
+flowchart TB
+    subgraph cluster["Kubernetes cluster (kind, 2 nodes)"]
+        target["Target application\n(e.g. TeaStore)"]
+        m1["Module 1 Controller\npredicted_risk\n:8000 /risk"]
+        m2["Module 2 Extender\nThompson Sampling bandit\n:8090 /state"]
+        m3["Module 3 Controller\nadaptive threshold\n:8091 /state"]
+        act["Actuator\nscale decision\n:8092 /state"]
+        sched["kube-scheduler\n+ extender webhook"]
+        k8s["Kubernetes API"]
+    end
+
+    target -- "HTTP probe (latency)" --> m1
+    k8s -- "CPU/memory metrics,\nreplica count" --> m1
+    m1 -- "/risk\n(predicted_risk + raw signals)" --> m3
+    m2 -- "/state\n(bandit posterior)" --> m3
+    m1 -- "/risk" --> act
+    m3 -- "/state\n(threshold, alert)" --> act
+    act -- "PATCH replicas" --> k8s
+    k8s -- "scales Deployment" --> target
+    sched -- "POST /filter, /prioritize" --> m2
+    sched -- "binds new pod" --> target

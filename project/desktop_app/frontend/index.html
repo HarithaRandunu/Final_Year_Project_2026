@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Autoscaling Control Center</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.ico" type="image/svg+xml">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="shell">
+  <nav id="nav" aria-label="Main navigation">
+    <div class="brand">Autoscaling Control Center</div>
+    <button class="nav-btn active" data-page="home">Home</button>
+    <button class="nav-btn" data-page="setup">Setup</button>
+    <button class="nav-btn" data-page="target-app">Target App</button>
+    <button class="nav-btn" data-page="monitoring">Live Monitoring</button>
+    <button class="nav-btn" data-page="results">Results</button>
+    <button class="nav-btn" data-page="diagrams">How It Works</button>
+  </nav>
+  <main id="content">
+    <section id="page-home" class="page active">
+      <h1>Autoscaling Control Center</h1>
+      <p>A Multi-Signal, Co-Scheduling Autoscaling Framework with Adaptive Control for SLA-Driven
+      Kubernetes Workloads &mdash; Module 1 (LightGBM + TreeSHAP signal fusion), Module 2 (discounted
+      Thompson Sampling co-scheduling), and Module 3 (PI + conformal adaptive control), running as one
+      system on a local Kubernetes cluster.</p>
+
+      <div class="panel">
+        <h3>System status</h3>
+        <div id="home-status"></div>
+      </div>
+
+      <h3>Where to go</h3>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Setup</div>
+          <div class="stat-value" style="font-size:15px">Install the tools, build the cluster</div>
+          <p class="caption">One click per tool, then one click for the whole cluster. Replaces every
+          command in <code>project/live_cluster/README.md</code> Part B.</p></div>
+        <div class="stat-card"><div class="stat-label">Target App</div>
+          <div class="stat-value" style="font-size:15px">Choose what to monitor and scale</div>
+          <p class="caption">A built-in preset, any Deployment already in the cluster, or your own
+          manifest. Nothing is hard-wired to TeaStore.</p></div>
+        <div class="stat-card"><div class="stat-label">Live Monitoring</div>
+          <div class="stat-value" style="font-size:15px">Watch the framework work</div>
+          <p class="caption">All four components' own endpoints, polled every 3&nbsp;seconds, plus a
+          load generator so there is something to react to.</p></div>
+        <div class="stat-card"><div class="stat-label">Results</div>
+          <div class="stat-value" style="font-size:15px">Training and ablation findings</div>
+          <p class="caption">Each module's validation, the Phase 4 integration check, and the live
+          25-trial ablation study with its statistics.</p></div>
+        <div class="stat-card"><div class="stat-label">How It Works</div>
+          <div class="stat-value" style="font-size:15px">Eight diagrams</div>
+          <p class="caption">Architecture, each module's train/test pipeline, the live control loop,
+          and the ablation arm configuration.</p></div>
+      </div>
+    </section>
+
+    <section id="page-setup" class="page">
+      <h1>Setup</h1>
+      <p>Detects the tools this app needs, installs what's missing (with your explicit permission per tool),
+      then bootstraps the whole live cluster in one job.</p>
+      <h3>Required tools</h3>
+      <div id="tool-status-list"></div>
+      <div id="tool-install-log"></div>
+
+      <p id="bootstrap-gate-note" class="caption">Install all of the tools above before bootstrapping the cluster.</p>
+      <div id="bootstrap-section" style="display:none">
+        <h3>Cluster bootstrap</h3>
+        <p class="caption">Creates the kind cluster, installs metrics-server + KEDA, deploys the target app,
+        builds and loads all 4 component images, deploys them, and wires the scheduler extender - everything
+        <code>project/live_cluster/README.md</code> Part B otherwise walks through by hand.</p>
+        <button id="btn-bootstrap" class="btn-install">Run bootstrap</button>
+        <div id="bootstrap-log"></div>
+      </div>
+    </section>
+
+    <section id="page-target-app" class="page">
+      <h1>Target App</h1>
+      <p>Chooses which application the framework monitors and scales. None of the three modules is
+      hard-wired to TeaStore &mdash; Module 1 and the actuator read the target's identity from environment
+      variables, and Module 2 scores <em>nodes</em>, so it is already app-agnostic. Switching target
+      therefore reconfigures the running controllers; it does not rebuild anything.</p>
+
+      <div class="panel">
+        <h3>Currently plugged in</h3>
+        <div id="ta-current"></div>
+      </div>
+
+      <div class="tabnav" id="ta-tabs">
+        <button class="tab-btn active" data-ta-tab="preset">Built-in preset</button>
+        <button class="tab-btn" data-ta-tab="existing">App already in the cluster</button>
+        <button class="tab-btn" data-ta-tab="manifest">Apply a manifest</button>
+      </div>
+
+      <div id="ta-tab-preset" class="subpage active">
+        <p class="caption">Presets carry a probe path that is already known to work, so there is nothing to
+        fill in. TeaStore restores exactly the configuration this project's Phase 5&ndash;7 results were produced under.</p>
+        <div id="ta-presets"></div>
+      </div>
+
+      <div id="ta-tab-existing" class="subpage">
+        <p class="caption">Lists every Deployment in the cluster together with the Services that actually route
+        to it (matched the way Kubernetes matches them, by label selector &mdash; not by similar names).</p>
+        <div class="form-grid">
+          <label>Deployment
+            <select id="ta-deployment"></select></label>
+          <label>Reach it through
+            <select id="ta-service"></select></label>
+          <label>Probe path
+            <input type="text" id="ta-probe-path" value="/" placeholder="/"></label>
+          <label>Min replicas
+            <input type="number" id="ta-min-replicas" value="1" min="1" max="10"></label>
+          <label>Max replicas
+            <input type="number" id="ta-max-replicas" value="2" min="1" max="10"></label>
+        </div>
+        <p id="ta-derived" class="caption"></p>
+        <button id="ta-refresh" class="btn-install">Refresh list</button>
+        <button id="ta-switch" class="btn-install">Switch target</button>
+      </div>
+
+      <div id="ta-tab-manifest" class="subpage">
+        <p class="caption">Runs <code>kubectl apply -f &lt;path&gt;</code> on a YAML file or a folder of them, so an app
+        that isn't in the cluster yet can become a target. Once it's applied, pick it on the
+        &ldquo;App already in the cluster&rdquo; tab. Building an app from source code is out of scope &mdash;
+        supply a manifest (or an image reference inside one) instead.</p>
+        <div class="form-grid">
+          <label>Manifest file or folder
+            <input type="text" id="ta-manifest-path" placeholder="C:\path\to\my-app.yaml" size="60"></label>
+        </div>
+        <button id="ta-use-example" class="btn-install">Use the bundled example</button>
+        <button id="ta-apply-manifest" class="btn-install">Apply manifest</button>
+        <p class="caption">The bundled example (<code>examples/demo-app.yaml</code>) deploys a ~7&nbsp;MB test web server
+        called <code>demo-whoami</code>, so you can try the whole flow without supplying an app of your own.
+        It needs internet access the first time, to pull the image. Remove it later with
+        <code>kubectl delete -f project/desktop_app/examples/demo-app.yaml</code>.</p>
+      </div>
+
+      <div id="ta-log"></div>
+    </section>
+
+    <section id="page-monitoring" class="page">
+      <h1>Live Monitoring</h1>
+      <p>Polls all four live components' own endpoints every 3 seconds through persistent
+      <code>kubectl port-forward</code> tunnels. Every value shown is read from the running system.</p>
+      <button id="mon-toggle" class="btn-install">Start monitoring</button>
+      <p id="mon-error" class="fail"></p>
+      <p id="mon-hint" class="caption" style="display:none">
+        Module 1 recomputes on its own 120-second bucket cycle and Module 3 on a 120-second control cycle,
+        so those two lines hold flat between cycles by design - that is the real cadence, not a stalled chart.
+        The actuator only runs during an ablation arm that uses it; "unreachable" there is normal otherwise.
+      </p>
+      <section class="panel">
+        <h3>Load generator</h3>
+        <p class="caption">Sends requests at random intervals to the target app, so you can watch the framework
+        react. Range defaults to 8-24 req/s - the band Phase 6's capacity probe validated on this host.
+        Separate from the k6 harness the formal ablation trials use.</p>
+        <div class="lg-controls">
+          <label for="lg-min">Min <output id="lg-min-val">8</output> req/s
+            <input type="range" id="lg-min" min="1" max="30" step="1" value="8"></label>
+          <label for="lg-max">Max <output id="lg-max-val">24</output> req/s
+            <input type="range" id="lg-max" min="1" max="30" step="1" value="24"></label>
+          <button id="lg-toggle" class="btn-install">Start load</button>
+        </div>
+        <div id="lg-stats"></div>
+      </section>
+
+      <div id="mon-tiles" class="stat-grid"></div>
+      <div id="mon-components"></div>
+      <div class="chart-grid">
+        <div class="chart-cell" id="mon-chart-risk"></div>
+        <div class="chart-cell" id="mon-chart-replicas"></div>
+        <div class="chart-cell" id="mon-chart-latency"></div>
+        <div class="chart-cell" id="mon-chart-resources"></div>
+        <div class="chart-cell" id="mon-chart-nodes"></div>
+      </div>
+    </section>
+
+    <section id="page-results" class="page">
+      <h1>Results</h1>
+      <div class="subnav">
+        <button class="subnav-btn active" data-subpage="training">Training Results</button>
+        <button class="subnav-btn" data-subpage="ablation">Ablation Results</button>
+      </div>
+
+      <div id="results-training" class="subpage active">
+        <div class="tabnav">
+          <button class="tab-btn active" data-tab="integration">🔗 Integration</button>
+          <button class="tab-btn" data-tab="module1">Module 1</button>
+          <button class="tab-btn" data-tab="module2">Module 2</button>
+          <button class="tab-btn" data-tab="module3">Module 3</button>
+        </div>
+        <div id="training-content"></div>
+      </div>
+
+      <div id="results-ablation" class="subpage">
+        <div id="ablation-content"></div>
+      </div>
+    </section>
+
+    <section id="page-diagrams" class="page">
+      <h1>How It Works</h1>
+      <div class="diagrams-layout">
+        <nav id="diagram-list" class="diagram-list" aria-label="Diagram list"></nav>
+        <div class="diagram-view">
+          <p id="diagram-description" class="caption"></p>
+          <div id="diagram-svg" class="diagram-svg"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/vendor/plotly.min.js"></script>
+<script src="/vendor/mermaid.min.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/criteria.js"></script>
+<script src="/js/results.js"></script>
+<script src="/js/diagrams.js"></script>
+<script src="/js/setup.js"></script>
+<script src="/js/target_app.js"></script>
+<script src="/js/monitoring.js"></script>
+<script src="/js/loadgen.js"></script>
+</body>
+</html>

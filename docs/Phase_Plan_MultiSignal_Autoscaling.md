@@ -213,6 +213,41 @@ Run 1c–1l once for the primary `msname`, then again for the second one (1a′)
 
 **Branch strategy:** built on a new `phase8-dashboard` branch off `main`, not directly on `main` — see `Progress_Trace_MultiSignal_Autoscaling.md`'s Phase 8 section for the full plan. Not yet merged into `main`.
 
+**Superseded 2026-07-30 by Phase 9 (below).** The Streamlit dashboard delivered exactly what this phase specified, and its limits then became the reason for Phase 9: it shows offline results and a one-shot offline "what-if", but it cannot touch the live `kind` cluster, cannot target any application other than TeaStore, and still requires the user to run the whole `project/live_cluster/README.md` Part B command chain by hand first. `project/dashboard/` is left in place and untouched — not deleted — so this phase's exit criteria remain independently verifiable.
+
+---
+
+## Phase 9 (Optional) — Live Autoscaling Control Center (web app)
+
+**Also not required for the core deliverable and does not block final submission.** Same standing as Phase 8, which it supersedes as the project's primary UI. Requested by the user on 2026-07-29 after reviewing Phase 8, on the grounds that "the user cannot do all these things to see our results" — i.e. the remaining barrier was operational, not presentational.
+
+**Entry criteria:** Phase 8 complete (its data-loading logic is ported, not rewritten), and a working live cluster from Phase 5.
+
+**Scope decisions, all confirmed with the user before implementation (do not revisit):**
+- **Stack: 100% Python.** A local `FastAPI` + `uvicorn` server, plain HTML/CSS/vanilla JS, with `plotly.min.js` and `mermaid.min.js` vendored so the app works fully offline and needs no Node/JS build toolchain. Chosen over Electron and over Streamlit primarily on memory: this project has a documented ~15.9GB usable-RAM ceiling (`Full_Plan.md` §11) and documented OOM incidents. **Originally delivered as a `pywebview` native window** (Windows' built-in WebView2, no bundled Chromium — verified on the host first: `pywebview` + `pythonnet` import cleanly under the system's Python 3.14.3, so no second Python install was needed). **Converted to a browser-served web app on 2026-07-30** at the user's request; see the conversion task below. The server-plus-static-frontend design is what made that a lifecycle change rather than a rewrite.
+- **Plug-in scope:** a built-in preset, any Deployment already running in the cluster, or a user-supplied Kubernetes manifest. Building an application **from source code is explicitly out of scope** — too large, and unnecessary given a manifest can name any image.
+- **Setup automation:** permission-gated, one click per tool via `winget`, with a guided manual fallback where automation cannot reliably finish (Docker Desktop's first-run EULA step).
+
+**Why this was cheap to build:** every live controller already reads its target's identity from env vars (`TARGET_DEPLOYMENT`, `TARGET_LABEL_SELECTOR`, `PROBE_URL`, `NAMESPACE`) — nothing is TeaStore-specific in code, only in default values. Module 2 needed no change at all, since it scores *nodes*. "Plug in a different app" is therefore `kubectl set env` + `rollout restart` on two Deployments, reusing existing code.
+
+**Tasks (built and checked in milestone order, not as one change):**
+- ~~M0: skeleton + asset vendoring~~ **Done 2026-07-29**
+- ~~M1: training/ablation results views~~ **Done 2026-07-29** — ports Phase 8's data loading; no recomputation.
+- ~~M2: eight Mermaid diagrams + rendering~~ **Done 2026-07-29** — the project had no diagrams of any kind before this.
+- ~~M3: orchestrator core + setup automation~~ **Done 2026-07-29**
+- ~~M4: port-forward manager + live monitoring~~ **Done 2026-07-30**
+- ~~M5: random load generator~~ **Done 2026-07-30**
+- ~~M6: target-app plug-in flow~~ **Done 2026-07-30**
+- ~~M7: polish + docs~~ **Done 2026-07-30** — including a UI/UX pass the user requested before M7 (responsive layout, larger charts, loading indicators, and honest status markers replacing red "Not confirmed" badges).
+- ~~Convert from a native window to a web application~~ **Done 2026-07-30** — user instruction after M7. **This reverses the delivery mode, not the stack:** it was already FastAPI + HTML/CSS/vanilla JS, so nothing in `backend/` or `frontend/` changed shape; only the process lifecycle did. `main.py` now serves `http://127.0.0.1:8877` and opens a browser tab, with the native-window launcher retained as `main_desktop.py` and `pywebview`/`pythonnet` demoted to optional dependencies. The RAM argument that originally picked pywebview over Electron is unaffected — a browser tab costs more than WebView2 and far less than a bundled Chromium. Three responsibilities the window had been absorbing were rebuilt explicitly (a predictable address, teardown on shutdown rather than on window close, and not assuming the only caller is the person at the keyboard); see `Progress_Trace_MultiSignal_Autoscaling.md`'s Phase 9 table for each.
+- ~~Security hardening required by that conversion~~ **Done 2026-07-30** — the app has no authentication and its endpoints install software, rebuild clusters, and apply arbitrary manifests, so it binds loopback only and **refuses** a non-loopback bind without an explicit `--allow-remote`, rejects foreign `Host` headers (DNS rebinding), and rejects cross-origin requests (a cross-site form POST would otherwise reach `/api/setup/bootstrap`, which takes no body). Verified with `curl`, not assumed.
+
+**Exit criteria:** an application that (1) installs the required tools and bootstraps the whole cluster without the user typing a command, (2) points the framework at an application of the user's choosing, (3) shows the three modules' live state while traffic flows, and (4) still shows all Phase 2–7 results plus explanatory diagrams. **Met 2026-07-30** — every milestone verified against the live cluster (not only unit-tested), including a target switch to two different applications and a from-scratch manifest apply. See `Progress_Trace_MultiSignal_Autoscaling.md`'s Phase 9 section for what each check actually proved and for the bugs found by running it.
+
+**Owner:** unassigned, same as Phase 8.
+
+**Branch strategy:** built on the same `phase8-dashboard` branch. Still not merged into `integration`/`main` as of 2026-07-30.
+
 ---
 
 ## Dependency Chain at a Glance
@@ -233,9 +268,11 @@ Phase 2 (Member 1)                           ✅ complete (one disclosed limitat
                               │
                         Phase 6 (all)   ✅ complete (descoped to 1 workload type - see notes above)
                               │
-                        Phase 7 (all)   ← you are here (core deliverable ends here)
+                        Phase 7 (all)   ✅ complete (core deliverable ends here)
                               │
-                        Phase 8 (optional, unassigned)   ← can be skipped entirely
+                        Phase 8 (optional, unassigned)   ✅ complete — Streamlit dashboard
+                              │
+                        Phase 9 (optional, unassigned)   ✅ complete — desktop app, supersedes Phase 8
 ```
 
-Phase 0 → Phase 1 → Phase 2 is a hard sequential chain at the start — data must be extracted before it can be preprocessed, and preprocessed before Module 1 can train. Everything from Phase 3 onward for Members 2 and 3 can proceed in parallel once Phase 2's exports exist. Phase 8 is drawn separately on purpose — nothing about the report or the core research contribution depends on it.
+Phase 0 → Phase 1 → Phase 2 is a hard sequential chain at the start — data must be extracted before it can be preprocessed, and preprocessed before Module 1 can train. Everything from Phase 3 onward for Members 2 and 3 can proceed in parallel once Phase 2's exports exist. Phases 8 and 9 are drawn separately on purpose — nothing about the report or the core research contribution depends on either, and both could be dropped without affecting submission.

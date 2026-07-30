@@ -1,0 +1,26 @@
+flowchart LR
+    subgraph baseline["baseline"]
+        b1["KEDA: ON"]
+        b2["Actuator: off"]
+        b3["Scheduler: default"]
+    end
+    subgraph m1_only["m1_only"]
+        m1a["KEDA: off"]
+        m1b["Actuator: ARM=m1_only\n(fixed threshold)"]
+        m1c["Scheduler: default"]
+    end
+    subgraph m2_only["m2_only"]
+        m2a["KEDA: ON"]
+        m2b["Actuator: off"]
+        m2c["Scheduler: extender"]
+    end
+    subgraph m3_only["m3_only"]
+        m3a["KEDA: off"]
+        m3b["Actuator: ARM=m3_only\n(M3 in cpu_direct mode)"]
+        m3c["Scheduler: default"]
+    end
+    subgraph full["full"]
+        fa["KEDA: off"]
+        fb["Actuator: ARM=full\n(M3 unablated)"]
+        fc["Scheduler: extender"]
+    end

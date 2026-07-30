@@ -1,0 +1,35 @@
+sequenceDiagram
+    participant App as Target app
+    participant K8s as Kubernetes API
+    participant M1 as Module 1
+    participant M2 as Module 2 (extender)
+    participant M3 as Module 3
+    participant Act as Actuator
+
+    loop every probe cycle (BUCKET_SECONDS)
+        M1->>App: HTTP probe (latency)
+        M1->>K8s: read CPU/memory metrics, replica count
+        M1->>M1: predict_risk() -> predicted_risk
+    end
+
+    loop every control cycle (POLL_SECONDS)
+        M3->>M1: GET /risk
+        M3->>M2: GET /state (bandit posterior)
+        M3->>M3: ACI update + PI step + oscillation widening
+        M3->>M3: new adaptive threshold, alert?
+    end
+
+    loop every actuation cycle (ACT_INTERVAL_SECONDS)
+        Act->>M1: GET /risk (signal)
+        Act->>M3: GET /state (threshold)
+        Act->>Act: band rule: signal > threshold -> +1,\nsignal < threshold*0.5 -> -1, else hold
+        alt scale up
+            Act->>K8s: PATCH replicas +1
+            K8s->>App: new pod scheduled
+            Note over K8s,M2: kube-scheduler calls Module 2's\n/filter + /prioritize for the new pod
+        else scale down
+            Act->>K8s: PATCH replicas -1
+        else hold
+            Act->>Act: no action
+        end
+    end

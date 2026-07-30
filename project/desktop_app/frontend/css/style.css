@@ -1,0 +1,399 @@
+:root {
+  --bg: #0f1216;
+  --surface: #171b21;
+  --border: #2a2f38;
+  --text: #e6e9ef;
+  --text-muted: #9aa3b2;
+  --accent: #2a78d6;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --border: #dde1e7;
+    --text: #14171c;
+    --text-muted: #5b6270;
+    --accent: #2a78d6;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+#shell {
+  display: flex;
+  height: 100vh;
+}
+
+#nav {
+  width: 200px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 4px;
+}
+
+#nav .brand {
+  font-weight: 600;
+  font-size: 14px;
+  padding: 8px 10px 16px;
+  color: var(--text-muted);
+}
+
+/* Narrow window: the sidebar becomes a scrollable top bar. A 200px fixed
+   sidebar costs a fifth of the width on a small window, which is where the
+   charts and tables need it most. */
+@media (max-width: 900px) {
+  #shell { flex-direction: column; height: 100vh; }
+  #nav {
+    width: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 8px;
+    align-items: center;
+  }
+  #nav .brand { display: none; }
+  .nav-btn { white-space: nowrap; padding: 8px 10px; }
+  #content { padding: 16px 18px; }
+}
+
+.nav-btn {
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.nav-btn:hover:not(:disabled) { background: var(--border); }
+.nav-btn.active { background: var(--accent); color: white; }
+.nav-btn:disabled { color: var(--text-muted); cursor: not-allowed; opacity: 0.6; }
+
+#content {
+  flex: 1;
+  overflow: auto;
+  padding: 24px 32px;
+}
+
+.page { display: none; }
+.page.active { display: block; }
+
+h1 { margin-top: 0; }
+h3 { margin-top: 28px; margin-bottom: 10px; }
+
+.subnav, .tabnav {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  padding-bottom: 0;
+}
+
+.subnav-btn, .tab-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  border-bottom: 2px solid transparent;
+}
+
+.subnav-btn.active, .tab-btn.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.subnav-btn:hover, .tab-btn:hover { color: var(--text); }
+
+.subpage { display: none; }
+.subpage.active { display: block; }
+
+.stat-grid {
+  display: grid;
+  /* auto-fit + minmax reflows on its own as the window resizes, so cards
+     never squash below a readable width and never stretch to a whole row. */
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.stat-value { font-size: 20px; font-weight: 600; }
+.stat-value .delta { font-size: 12px; font-weight: 400; color: var(--text-muted); display: block; margin-top: 2px; }
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 8px 0 16px;
+}
+.data-table th, .data-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.data-table th { color: var(--text-muted); font-weight: 600; }
+
+.table-scroll { overflow-x: auto; max-height: 400px; overflow-y: auto; }
+
+/* Every wide table gets its own horizontal scroll container, so a table too
+   wide for the window scrolls inside itself instead of forcing the whole page
+   to scroll sideways. */
+.table-wrap { overflow-x: auto; margin: 8px 0 16px; }
+.table-wrap .data-table { margin: 0; min-width: 520px; }
+
+.image-grid {
+  display: grid;
+  /* Two per row at most, same reasoning as .chart-grid: these are exported
+     research plots with axis labels and legends baked in at a fixed size, so
+     at three across the tick labels stop being legible. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 12px 0;
+}
+
+@media (max-width: 1100px) {
+  .image-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.image-grid figure { margin: 0; }
+.image-grid img { width: 100%; border-radius: 6px; border: 1px solid var(--border); }
+.image-grid figcaption { font-size: 12px; color: var(--text-muted); margin-top: 4px; text-align: center; }
+
+.chart-grid {
+  display: grid;
+  /* Exactly two charts per row - a hard cap, not auto-fit. auto-fit would let
+     a maximised window on a wide monitor fit a third column (a 1600px window
+     leaves ~1336px of content, enough for three 440px cells), which is the
+     cramped layout this replaced. minmax(0, 1fr) rather than 1fr so a wide
+     child (a Plotly SVG) can't push the column past its share. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1100px) {
+  /* Below this, half the content width is too narrow for a legible chart, so
+     they go full-width one per row instead. */
+  .chart-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.chart-cell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 0;         /* lets a grid child shrink instead of overflowing */
+  position: relative;
+  min-height: 300px;    /* reserves the cell's space before Plotly draws */
+}
+
+.warn { color: #d68a2a; }
+.info { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; }
+.caption { font-size: 13px; color: var(--text-muted); }
+.pass { color: #1baf7a; }
+.fail { color: #e0554a; }
+
+/* Status colors, reserved for state and never reused as a series color. Each
+   is always paired with an icon and a word, so state is never carried by
+   color alone. "partial" is the amber one: a criterion that a stress test or
+   the live study resolved, rather than a failure. */
+.partial { color: #d68a2a; }
+
+.status-note {
+  border-left: 3px solid #d68a2a;
+  background: var(--surface);
+  border-radius: 0 6px 6px 0;
+  padding: 8px 12px;
+  margin: 6px 0 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.status-note b { color: var(--text); font-weight: 600; }
+.status-note .resolution { display: block; margin-top: 4px; }
+
+/* --- loading spinner ------------------------------------------------------
+   One shared component for every async load, so "the app is working" always
+   looks the same rather than each page inventing its own hint. */
+.spinner-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.spinner-wrap.inline { padding: 8px 0; justify-content: flex-start; }
+.spinner-wrap.overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--surface);
+  border-radius: 8px;
+  z-index: 2;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.spinner.small { width: 13px; height: 13px; border-width: 2px; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Respect a user who has asked for less motion: keep the indicator, drop the
+   rotation, so it reads as a static "busy" badge instead of vanishing. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+}
+
+button .spinner { display: inline-block; vertical-align: -2px; margin-right: 6px; border-top-color: white; }
+
+select { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; margin: 8px 0; }
+details summary { cursor: pointer; margin: 16px 0 8px; color: var(--text-muted); }
+
+.diagrams-layout { display: flex; gap: 24px; align-items: flex-start; }
+.diagram-list { display: flex; flex-direction: column; gap: 2px; width: 240px; flex-shrink: 0; }
+.diagram-list .diagram-btn { text-align: left; }
+.diagram-view { flex: 1; min-width: 0; }
+
+/* Below this width the side-by-side list + diagram leaves the diagram too
+   narrow to read, so the list moves above it and scrolls horizontally. */
+@media (max-width: 1000px) {
+  .diagrams-layout { flex-direction: column; gap: 12px; }
+  .diagram-list { flex-direction: row; width: 100%; overflow-x: auto; gap: 4px; }
+  .diagram-list .diagram-btn { white-space: nowrap; }
+  .diagram-view { width: 100%; }
+}
+.diagram-svg {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  overflow: auto;
+}
+.diagram-svg svg { max-width: 100%; height: auto; }
+
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.btn-install {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.btn-install:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-danger { background: #e0554a; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 16px 0;
+}
+.panel h3 { margin-top: 0; }
+
+.lg-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.lg-controls input[type="range"] { max-width: 100%; }
+.lg-controls label {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: var(--text-muted);
+  gap: 4px;
+}
+.lg-controls input[type="range"] { width: 180px; }
+.lg-controls output { color: var(--text); font-weight: 600; }
+
+.form-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  align-items: flex-end;
+  margin: 12px 0;
+}
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 0;
+  max-width: 100%;
+}
+.form-grid input {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  /* max-width keeps a wide field (the manifest path uses size="60") from
+     pushing the row past the window edge on a small window; min-width:0 lets
+     the flex item actually shrink to it. */
+  max-width: 100%;
+  min-width: 0;
+}
+.form-grid input[type="number"] { width: 80px; }
+.form-grid select { margin: 0; max-width: min(420px, 100%); }
+
+.kv-table td:first-child { color: var(--text-muted); width: 210px; }
+
+@media (max-width: 720px) {
+  /* One field per line: at this width two side-by-side selects each end up
+     too narrow to read a Deployment name in. */
+  .form-grid { flex-direction: column; align-items: stretch; }
+  .kv-table td:first-child { width: auto; }
+}
+
+.job-log {
+  background: #05070a;
+  color: #c9d1d9;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  padding: 10px;
+  border-radius: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}

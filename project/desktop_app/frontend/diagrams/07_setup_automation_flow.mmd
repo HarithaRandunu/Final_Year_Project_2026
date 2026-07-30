@@ -1,0 +1,18 @@
+flowchart TD
+    detect["Detect tools: Docker Desktop, kind, kubectl, helm\n(run <tool> --version)"]
+    branch{"Installed?"}
+    ready["Tool ready"]
+    ask["Show 'Install' button\n(explicit user click = permission)"]
+    winget["winget install -e --id <package>"]
+    dockercard["Docker Desktop only: stop after install,\nshow guided manual card\n(open app, accept EULA, wait for whale icon)"]
+    recheck["Recheck detection"]
+    bootstrap["One-click cluster bootstrap job:\nkind create cluster -> untaint control-plane\n-> metrics-server -> KEDA\n-> deploy target app + baseline\n-> build + kind load 4 images\n-> deploy module1/2/3 + actuator\n-> scheduler-extender wiring"]
+    live(["All pods Running - ready for monitoring"])
+
+    detect --> branch
+    branch -- yes --> ready
+    branch -- no --> ask --> winget
+    winget --> dockercard
+    winget --> recheck
+    dockercard --> recheck --> branch
+    ready --> bootstrap --> live
