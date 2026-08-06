@@ -1,0 +1,121 @@
+# Our second scheduler, running as an ordinary in-cluster Deployment.
+#
+# Apply order (the ConfigMap is built from the sibling file, not duplicated
+# into this YAML, so the config is edited in exactly one place):
+#
+#   kubectl create configmap module2-scheduler-config \
+#     -n kube-system --from-file=scheduler-config.yaml=./scheduler-config.yaml
+#   kubectl apply -f deployment.yaml
+#
+# After a config change:
+#   kubectl create configmap module2-scheduler-config -n kube-system \
+#     --from-file=scheduler-config.yaml=./scheduler-config.yaml \
+#     --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl rollout restart deployment/module2-scheduler -n kube-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: module2-scheduler
+  namespace: kube-system
+---
+# The built-in system:kube-scheduler ClusterRole already carries everything a
+# scheduler needs (watch pods/nodes, create bindings, emit events). Reusing it
+# is both less code and less privilege than writing our own.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: module2-scheduler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:kube-scheduler
+subjects:
+  - kind: ServiceAccount
+    name: module2-scheduler
+    namespace: kube-system
+---
+# Binding PersistentVolumes is a separate role. We use no PVCs, but a
+# scheduler without it logs permission errors on every cycle, which buries the
+# extender messages Phase D needs to read.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: module2-scheduler-volume
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:volume-scheduler
+subjects:
+  - kind: ServiceAccount
+    name: module2-scheduler
+    namespace: kube-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: module2-scheduler
+  namespace: kube-system
+  labels:
+    app: module2-scheduler
+spec:
+  # Exactly one. Leader election is disabled in scheduler-config.yaml; if you
+  # raise this, re-enable it there first with its own resourceName.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: module2-scheduler
+  template:
+    metadata:
+      labels:
+        app: module2-scheduler
+    spec:
+      serviceAccountName: module2-scheduler
+      containers:
+        - name: kube-scheduler
+          # MUST match the cluster's Kubernetes version (../cluster.yaml sets
+          # 1.34). A mismatch shows up either as the binary rejecting the
+          # config's apiVersion, or as subtle scheduling differences from the
+          # managed scheduler.
+          #
+          # Confirm the exact patch level once the cluster exists and correct
+          # this tag if EKS provisioned a different one:
+          #   kubectl version -o json | jq -r .serverVersion.gitVersion
+          # (v1.34.0-v1.34.3 all verified present in registry.k8s.io.)
+          image: registry.k8s.io/kube-scheduler:v1.34.0
+          command:
+            - /usr/local/bin/kube-scheduler
+            - --config=/etc/kubernetes/scheduler-config.yaml
+            - --v=2          # verbose enough to see extender calls in the log
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 10259
+              scheme: HTTPS
+            initialDelaySeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 10259
+              scheme: HTTPS
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/kubernetes
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: module2-scheduler-config

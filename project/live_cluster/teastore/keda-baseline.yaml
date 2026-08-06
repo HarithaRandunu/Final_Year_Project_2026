@@ -1,6 +1,11 @@
-# maxReplicaCount: 2, not 3 - see hpa-baseline.yaml's note. This is an
-# alternative arm to hpa-baseline.yaml (same scaleTargetRefs) - the two
-# aren't applied simultaneously.
+# teastore-webui maxReplicaCount: restored to 3 on 2026-08-06, on a
+# dedicated Hetzner cloud VM - see hpa-baseline.yaml's note for the full
+# reasoning. This is the study's actual intended ceiling (teastore-image
+# pinned to a fixed 1 below to remove the old 3+3-simultaneous failure
+# mode). Was temporarily reverted to 2 on 2026-07-30 only because the local
+# host couldn't sustain even one trial's setup phase at this ceiling.
+# This is an alternative arm to hpa-baseline.yaml (same scaleTargetRefs) -
+# the two aren't applied simultaneously.
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -9,13 +14,16 @@ spec:
   scaleTargetRef:
     name: teastore-webui
   minReplicaCount: 1
-  maxReplicaCount: 2
+  maxReplicaCount: 3
   triggers:
     - type: cpu
       metricType: Utilization
       metadata:
         value: "50"
 ---
+# teastore-image pinned to a fixed 1 replica (min=max=1) - added 2026-07-30,
+# same reasoning as hpa-baseline.yaml: not part of what this study measures,
+# should not compete for memory with teastore-webui.
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -24,7 +32,7 @@ spec:
   scaleTargetRef:
     name: teastore-image
   minReplicaCount: 1
-  maxReplicaCount: 2
+  maxReplicaCount: 1
   triggers:
     - type: cpu
       metricType: Utilization

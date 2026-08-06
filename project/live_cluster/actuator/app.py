@@ -21,11 +21,19 @@ rationale of why each arm is defined this way):
 Band rule (symmetric, same for every arm so only the signal/threshold
 source differs, per the design doc): signal > threshold -> +1 replica;
 signal < threshold * 0.5 -> -1 replica; else hold. Bounded to
-[MIN_REPLICAS, MAX_REPLICAS] - [1, 2], the same lowered ceiling as the
-HPA/KEDA baselines after Phase 5's third rebuild (see Full_Plan.md
-Section 11) - and rate limited by COOLDOWN_SECONDS (mirrors HPA's default
-stabilization window) so no arm gets a reaction-speed advantage purely
-from actuator naivety.
+[MIN_REPLICAS, MAX_REPLICAS] - [1, 3] restored 2026-08-06 on the dedicated
+Hetzner VM (see docs/Progress_Trace_MultiSignal_Autoscaling.md's
+results_v2-on-cloud-VM section). Was temporarily [1, 2] on 2026-07-30 only
+because the local host couldn't sustain even one trial's setup phase at
+ceiling=3 - not a retraction of the results_v2 study's actual design, which
+has always been [1, 3]; restored now that this runs on a host with real
+dedicated headroom instead of memory shared with Windows/WSL2/Docker
+Desktop/VS Code. MUST always match the HPA/KEDA baselines' own ceiling
+(teastore/hpa-baseline.yaml, teastore/keda-baseline.yaml) or the arms
+wouldn't be comparable - change all three together, never one alone.
+Rate limited by COOLDOWN_SECONDS (mirrors HPA's default stabilization
+window) so no arm gets a reaction-speed advantage purely from actuator
+naivety.
 """
 from __future__ import annotations
 
@@ -49,7 +57,7 @@ TARGET_DEPLOYMENT = os.environ.get("TARGET_DEPLOYMENT", "teastore-webui")
 ACT_INTERVAL_SECONDS = float(os.environ.get("ACT_INTERVAL_SECONDS", "30"))
 COOLDOWN_SECONDS = float(os.environ.get("COOLDOWN_SECONDS", "90"))
 MIN_REPLICAS = int(os.environ.get("MIN_REPLICAS", "1"))
-MAX_REPLICAS = int(os.environ.get("MAX_REPLICAS", "2"))
+MAX_REPLICAS = int(os.environ.get("MAX_REPLICAS", "3"))
 # 0.08, not 0.5: the first-pass ablation run found Module 1's predicted_risk
 # on TeaStore actually operates in roughly a 0.003-0.3 range (see
 # Progress_Trace.md's Phase 6 section) - a naive "prior sense of scale"

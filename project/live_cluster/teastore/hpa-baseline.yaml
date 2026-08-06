@@ -1,7 +1,16 @@
-# maxReplicas: 2, not 3 - lowered from the previous attempt after
-# discovering the real usable RAM ceiling is ~15.9GB, not 23.4GB (see
-# Full_Plan.md Section 11). 3+3 simultaneous replicas across webui+image
-# was directly implicated in that discovery's memory incidents.
+# teastore-webui maxReplicas: restored to 3 on 2026-08-06, on a dedicated
+# Hetzner cloud VM (see docs/Progress_Trace_MultiSignal_Autoscaling.md's
+# results_v2-on-cloud-VM section). This is the study's actual intended
+# ceiling (raised from the original 2 after discovering the local host's
+# real usable RAM ceiling was ~15.9GB not 23.4GB, Full_Plan.md Section 11,
+# with teastore-image pinned to a fixed 1 below specifically to remove the
+# old 3+3-simultaneous failure mode). Was temporarily reverted to 2 on
+# 2026-07-30 only because the local host couldn't sustain even one trial's
+# setup phase at this ceiling (a host memory constraint, not evidence 3
+# replicas is unsafe once running - the capacity probe validated 3 replicas
+# handling 32 req/s cleanly). Restored now that this runs on a host with
+# real dedicated headroom instead of memory shared with Windows/WSL2/Docker
+# Desktop/VS Code.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -12,7 +21,7 @@ spec:
     kind: Deployment
     name: teastore-webui
   minReplicas: 1
-  maxReplicas: 2
+  maxReplicas: 3
   metrics:
     - type: Resource
       resource:
@@ -21,6 +30,11 @@ spec:
           type: Utilization
           averageUtilization: 50
 ---
+# teastore-image pinned to a fixed 1 replica (min=max=1, i.e. not actually
+# autoscaled) - added 2026-07-30. It has its own autoscaler but never
+# appears in module1_controller/app.py or actuator/app.py (both hardcode
+# TARGET_DEPLOYMENT=teastore-webui), so it isn't part of what this study
+# measures and should not compete for memory with the service that is.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -31,7 +45,7 @@ spec:
     kind: Deployment
     name: teastore-image
   minReplicas: 1
-  maxReplicas: 2
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:

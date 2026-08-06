@@ -1,0 +1,64 @@
+# KubeSchedulerConfiguration for our OWN scheduler on EKS.
+#
+# Why this file exists: on kind, Module 2 is wired in by overwriting the
+# kube-scheduler static-pod manifest inside the control-plane container
+# (run_trial.py's set_scheduler_mode does two `docker cp`s). EKS's control
+# plane is fully managed - there is no node to exec into and kube-scheduler
+# cannot be given a config. So instead we run a SECOND scheduler as an
+# ordinary in-cluster Deployment, and select it per workload with
+# spec.schedulerName.
+#
+# module2_extender/app.py is NOT modified. The extender contract is unchanged;
+# only who calls it changes.
+#
+# Adapted from live_cluster/module2_extender/scheduler-extender-config.yaml,
+# with four differences - each one required, and each one a real bug if missed.
+---
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+
+# (1) THE ONE THAT IS EASIEST TO MISS.
+# A scheduler only acts on Pods whose spec.schedulerName matches a profile it
+# declares, and the default profile name is "default-scheduler". Without this
+# block we would claim THE SAME NAME as the AWS-managed scheduler, and the two
+# would race to bind every pod in the cluster - silently, and looking like
+# flaky scheduling rather than a misconfiguration.
+profiles:
+  - schedulerName: module2-scheduler
+
+# (2) No clientConnection.kubeconfig.
+# The kind config points at /etc/kubernetes/scheduler.conf, a path that only
+# exists on a control-plane node. An in-cluster scheduler authenticates with
+# its ServiceAccount token, which the client library picks up automatically
+# from /var/run/secrets/... - so the field is simply omitted.
+
+# (3) Leader election off.
+# We run a single replica, so there is nothing to elect. More importantly, the
+# default lease name/namespace is the same one the AWS-managed scheduler uses;
+# leaving leaderElect on would make our scheduler contend for the managed
+# control plane's lease. If you ever scale this Deployment past 1 replica,
+# turn it back on AND give it its own resourceName/resourceNamespace.
+leaderElection:
+  leaderElect: false
+
+# (4) The extender is addressed by DNS, not by a hard-coded ClusterIP.
+# On kind the ClusterIP had to be hard-coded (and re-grepped after every
+# cluster rebuild - see live_cluster/README.md) because kind's scheduler is a
+# static pod on the HOST network and has no access to cluster DNS. Our
+# scheduler is an ordinary pod, so it does have DNS. That whole fragile step
+# disappears here.
+extenders:
+  - urlPrefix: "http://module2-extender.default.svc.cluster.local:8090"
+    filterVerb: "filter"
+    prioritizeVerb: "prioritize"
+    weight: 1
+    enableHTTPS: false
+    nodeCacheCapable: false
+    # ignorable: true means a scheduling decision still succeeds if the
+    # extender is unreachable, falling back to stock scoring. Kept as-is from
+    # the kind config: an extender outage should degrade Module 2, not wedge
+    # the cluster. NOTE for the ablation - this means a silently-dead extender
+    # looks like a working m2 arm. Phase D's check (extender logs a /filter
+    # and a /prioritize hit) is what rules that out.
+    ignorable: true
+    httpTimeout: 5s

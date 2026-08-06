@@ -43,6 +43,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 import json
+import re
 import subprocess
 import sys
 import time
@@ -60,7 +61,7 @@ LIVE_CLUSTER_DIR = Path(__file__).resolve().parent.parent
 TEASTORE_DIR = LIVE_CLUSTER_DIR / "teastore"
 MODULE2_DIR = LIVE_CLUSTER_DIR / "module2_extender"
 LOADGEN_DIR = LIVE_CLUSTER_DIR / "loadgen"
-RESULTS_DIR = Path(__file__).resolve().parents[2] / "results" / "ablation"
+DEFAULT_RESULTS_DIR = Path(__file__).resolve().parents[2] / "results" / "ablation"
 FEATURES_PATH = Path(__file__).resolve().parents[2] / "data" / "processed" / "features_primary.parquet"
 
 CONTROL_PLANE_NODE = "fyp-autoscaling-control-plane"
@@ -94,23 +95,45 @@ def run_ignore_errors(cmd: list[str], timeout: int = 60) -> None:
 
 
 def free_gb() -> float:
-    class MEMORYSTATUSEX(ctypes.Structure):
-        _fields_ = [
-            ("dwLength", ctypes.c_ulong),
-            ("dwMemoryLoad", ctypes.c_ulong),
-            ("ullTotalPhys", ctypes.c_ulonglong),
-            ("ullAvailPhys", ctypes.c_ulonglong),
-            ("ullTotalPageFile", ctypes.c_ulonglong),
-            ("ullAvailPageFile", ctypes.c_ulonglong),
-            ("ullTotalVirtual", ctypes.c_ulonglong),
-            ("ullAvailVirtual", ctypes.c_ulonglong),
-            ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
-        ]
+    """Cross-platform free-memory check. Was Windows-only (ctypes.windll) -
+    this project's local dev machine is Windows, but this same safety net is
+    exactly as necessary on a Linux host (a cloud VM, added 2026-07-31 after
+    the local machine proved unable to sustain even one trial's setup
+    overhead) - a NotImplementedError here would silently defeat the whole
+    safety net on Linux rather than raising loudly, which is worse than
+    either platform branch failing to import.
+    """
+    if sys.platform == "win32":
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
 
-    stat = MEMORYSTATUSEX()
-    stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
-    ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
-    return stat.ullAvailPhys / (1024**3)
+        stat = MEMORYSTATUSEX()
+        stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+        return stat.ullAvailPhys / (1024**3)
+
+    # Linux: /proc/meminfo's MemAvailable, not MemFree - MemFree excludes
+    # reclaimable page cache/buffers and is pessimistic (it would trigger
+    # false aborts on a healthy, cache-heavy Linux host). MemAvailable is the
+    # kernel's own estimate of what a new allocation can actually get,
+    # which is the same "can I safely start more work" question ullAvailPhys
+    # answers on Windows.
+    with open("/proc/meminfo") as f:
+        for line in f:
+            if line.startswith("MemAvailable:"):
+                kb = int(line.split()[1])
+                return kb / (1024**2)
+    raise RuntimeError("MemAvailable not found in /proc/meminfo - unexpected kernel/proc format")
 
 
 def current_scheduler_mode() -> str:
@@ -124,6 +147,19 @@ def set_scheduler_mode(mode: str) -> bool:
         print(f"scheduler already in '{mode}' mode, skipping swap")
         return False
     if mode == "extender":
+        # module2-extender's ClusterIP is assigned fresh by each cluster and
+        # is not stable across recreations (confirmed 2026-08-06: a fresh
+        # cluster's IP didn't match what was committed in EXTENDER_CONFIG
+        # from a prior cluster, leaving the scheduler's own /readyz
+        # permanently unhealthy - README's manual Step 10 always did this
+        # rewrite, but this automated path never had - rewriting here closes
+        # that gap for good rather than requiring the manual fix every time).
+        svc_ip = run(
+            ["kubectl", "get", "svc", "module2-extender", "-o", "jsonpath={.spec.clusterIP}"]
+        ).stdout.strip()
+        config_text = EXTENDER_CONFIG.read_text()
+        config_text = re.sub(r'urlPrefix:.*', f'urlPrefix: "http://{svc_ip}:8090"', config_text)
+        EXTENDER_CONFIG.write_text(config_text)
         run(["docker", "cp", str(EXTENDER_CONFIG), f"{CONTROL_PLANE_NODE}:/etc/kubernetes/scheduler-extender-config.yaml"])
         run(["docker", "cp", str(EXTENDER_MANIFEST), f"{CONTROL_PLANE_NODE}:{DEFAULT_SCHEDULER_MANIFEST}"])
     else:
@@ -281,7 +317,7 @@ def get_replica_count(deployment: str) -> int:
         return 0
 
 
-def run_trial(arm: str, run_tag: str, min_rps: float, max_rps: float, duration: int, min_free_gb: float, poll_seconds: int) -> dict:
+def run_trial(arm: str, run_tag: str, min_rps: float, max_rps: float, duration: int, min_free_gb: float, poll_seconds: int, results_dir: Path = DEFAULT_RESULTS_DIR) -> dict:
     run_id = f"{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H-%M-%S')}_{arm}_{run_tag}"
     print(f"=== Trial {run_id} ===")
 
@@ -341,10 +377,10 @@ def run_trial(arm: str, run_tag: str, min_rps: float, max_rps: float, duration: 
         if pf3:
             pf3.terminate()
 
-    return build_metrics(run_id, arm, run_tag, samples, start_time, end_time, aborted, abort_reason, stages, scheduler_swapped)
+    return build_metrics(run_id, arm, run_tag, samples, start_time, end_time, aborted, abort_reason, stages, scheduler_swapped, results_dir)
 
 
-def build_metrics(run_id, arm, run_tag, samples, start_time, end_time, aborted, abort_reason, stages, scheduler_swapped=False) -> dict:
+def build_metrics(run_id, arm, run_tag, samples, start_time, end_time, aborted, abort_reason, stages, scheduler_swapped=False, results_dir: Path = DEFAULT_RESULTS_DIR) -> dict:
     # A scheduler swap's cold-start effect (first-pass finding: real latency
     # spikes in m2_only/full's opening bucket) gets an 80s extra settle in
     # configure_arm() already - this is a second, cheaper layer of defense:
@@ -406,7 +442,7 @@ def build_metrics(run_id, arm, run_tag, samples, start_time, end_time, aborted, 
         ),
     }
 
-    out_dir = RESULTS_DIR / run_id
+    out_dir = results_dir / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))
     print(f"Wrote {out_dir / 'metrics.json'}")
@@ -422,10 +458,17 @@ def main() -> None:
     parser.add_argument("--duration", type=int, default=900)
     parser.add_argument("--min-free-gb", type=float, default=2.0)
     parser.add_argument("--poll-seconds", type=int, default=30)
+    parser.add_argument(
+        "--results-dir", type=Path, default=DEFAULT_RESULTS_DIR,
+        help="Where to write <run_id>/metrics.json. Defaults to results/ablation "
+             "(the Phase 6 tree). Pass an explicit path (e.g. results_v2/ablation) "
+             "for any study that must not modify Phase 6's committed results.",
+    )
     args = parser.parse_args()
 
     metrics = run_trial(
-        args.arm, args.run_tag, args.min_rps, args.max_rps, args.duration, args.min_free_gb, args.poll_seconds
+        args.arm, args.run_tag, args.min_rps, args.max_rps, args.duration, args.min_free_gb, args.poll_seconds,
+        results_dir=args.results_dir,
     )
     print(json.dumps({k: v for k, v in metrics.items() if k not in ("replica_trajectory", "module1_predicted_risk_trace", "module3_threshold_trace", "k6_stages")}, indent=2))
 

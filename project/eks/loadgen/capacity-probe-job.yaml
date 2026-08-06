@@ -1,0 +1,65 @@
+# Runs the EKS capacity probe in-cluster, so load originates from inside the
+# cluster. On EKS this matters far more than it did on kind: driving load from
+# your laptop would measure your home internet's round-trip time, not the
+# cluster's behaviour.
+#
+# The script is mounted from a ConfigMap built straight from capacity_probe.js,
+# so it is edited in one place rather than duplicated into YAML:
+#
+#   kubectl create configmap eks-capacity-probe-script \
+#     --from-file=capacity_probe.js=./capacity_probe.js
+#
+# Then, per sweep (edit RATES, delete + recreate the Job):
+#   kubectl delete job eks-capacity-probe --ignore-not-found
+#   kubectl apply -f capacity-probe-job.yaml
+#   kubectl logs -f job/eks-capacity-probe
+#
+# Watch alongside, in another terminal:
+#   kubectl top pods -l run=teastore-webui
+#   kubectl get deploy teastore-webui -w
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: eks-capacity-probe
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      containers:
+        - name: k6
+          image: grafana/k6:latest
+          args: ["run", "/scripts/capacity_probe.js"]
+          env:
+            - name: TARGET_URL
+              value: "http://teastore-webui:8080/tools.descartes.teastore.webui/"
+            # Start here, then sweep upward until p99 turns sharply. These are
+            # a STARTING GUESS for 4 x t3.large at maxReplicas=6 - roughly 3-4x
+            # the kind cluster's validated 8-24 req/s band. Do not treat them
+            # as validated; finding the real number is the point of this job.
+            - name: RATES
+              value: "25,50,100,150,200"
+            - name: STEP_SECONDS
+              value: "45"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 128Mi
+            # Higher than the kind probe's 300m/128Mi: generating 200 req/s
+            # needs meaningfully more CPU than 24 req/s did, and a
+            # CPU-throttled generator under-delivers its arrival rate, which
+            # would read as the application coping when it is really the load
+            # generator giving up.
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+      volumes:
+        - name: script
+          configMap:
+            name: eks-capacity-probe-script

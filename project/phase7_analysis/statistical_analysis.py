@@ -21,6 +21,7 @@ as a well-powered study - flagged again in the output, not just here.
 """
 from __future__ import annotations
 
+import argparse
 import json
 from itertools import combinations
 from pathlib import Path
@@ -30,11 +31,11 @@ import pandas as pd
 from scipy import stats
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-ABLATION_RESULTS_DIR = PROJECT_DIR / "results" / "ablation"
-RESULTS_DIR = PROJECT_DIR / "results" / "phase7"
+DEFAULT_ABLATION_RESULTS_DIR = PROJECT_DIR / "results" / "ablation"
+DEFAULT_RESULTS_DIR = PROJECT_DIR / "results" / "phase7"
+DEFAULT_TAG_PREFIXES = ("scaleup1_t", "scaleup2_t")
 
 ARMS = ["baseline", "m1_only", "m2_only", "m3_only", "full"]
-INCLUDED_TAG_PREFIXES = ("scaleup1_t", "scaleup2_t")
 
 METRICS = {
     "sla_violation_count": ("lower_is_better", "SLA violation count"),
@@ -47,14 +48,13 @@ METRICS = {
 }
 
 
-def load_dataset() -> pd.DataFrame:
+def load_dataset(ablation_dir: Path = DEFAULT_ABLATION_RESULTS_DIR, tag_prefixes: tuple[str, ...] = DEFAULT_TAG_PREFIXES) -> pd.DataFrame:
     rows = []
-    for run_dir in sorted(ABLATION_RESULTS_DIR.iterdir()):
+    for run_dir in sorted(ablation_dir.iterdir()):
         if not run_dir.is_dir():
             continue
-        tag = run_dir.name.split("_", 2)
         run_tag = run_dir.name
-        if not any(f"_{p}" in run_tag for p in INCLUDED_TAG_PREFIXES):
+        if not any(f"_{p}" in run_tag for p in tag_prefixes):
             continue
         metrics_path = run_dir / "metrics.json"
         if not metrics_path.exists():
@@ -173,8 +173,33 @@ def ablation_decomposition(df: pd.DataFrame, metric: str) -> dict:
     }
 
 
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--results-dir", type=Path, default=DEFAULT_ABLATION_RESULTS_DIR,
+        help="Directory of <run_id>/metrics.json trial folders to analyze "
+             "(default: results/ablation, the Phase 6 dataset). Pass "
+             "results_v2/ablation for the raised-replica-ceiling study.",
+    )
+    parser.add_argument(
+        "--output-dir", type=Path, default=DEFAULT_RESULTS_DIR,
+        help="Where to write statistical_analysis.json/trial_level_data.csv/"
+             "the distribution plot (default: results/phase7).",
+    )
+    parser.add_argument(
+        "--tag-prefixes", default=",".join(DEFAULT_TAG_PREFIXES),
+        help="Comma-separated run_tag prefixes to include (default: "
+             f"{','.join(DEFAULT_TAG_PREFIXES)}). Pass v2_t for the "
+             "results_v2 study's trial tags.",
+    )
+    return parser.parse_args(argv)
+
+
 def main() -> None:
-    df = load_dataset()
+    args = parse_args()
+    tag_prefixes = tuple(p for p in args.tag_prefixes.split(",") if p)
+
+    df = load_dataset(args.results_dir, tag_prefixes)
     n_per_arm = df["arm"].value_counts().to_dict()
     print(f"Loaded {len(df)} trials: {n_per_arm}")
     assert all(n_per_arm.get(arm, 0) == 5 for arm in ARMS), \
@@ -224,13 +249,13 @@ def main() -> None:
         "ablation_decomposition": decomposition_results,
     }
 
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    with open(RESULTS_DIR / "statistical_analysis.json", "w", encoding="utf-8") as f:
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    with open(args.output_dir / "statistical_analysis.json", "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2)
-    print(f"\nSaved full results to {RESULTS_DIR / 'statistical_analysis.json'}")
+    print(f"\nSaved full results to {args.output_dir / 'statistical_analysis.json'}")
 
-    df.to_csv(RESULTS_DIR / "trial_level_data.csv", index=False)
-    print(f"Saved trial-level data to {RESULTS_DIR / 'trial_level_data.csv'}")
+    df.to_csv(args.output_dir / "trial_level_data.csv", index=False)
+    print(f"Saved trial-level data to {args.output_dir / 'trial_level_data.csv'}")
 
     try:
         import matplotlib
@@ -248,9 +273,9 @@ def main() -> None:
             ax.axis("off")
         fig.suptitle("Phase 7: metric distributions by arm (n=5/arm)")
         fig.tight_layout()
-        fig.savefig(RESULTS_DIR / "metric_distributions_by_arm.png")
+        fig.savefig(args.output_dir / "metric_distributions_by_arm.png")
         plt.close(fig)
-        print(f"Saved plot to {RESULTS_DIR / 'metric_distributions_by_arm.png'}")
+        print(f"Saved plot to {args.output_dir / 'metric_distributions_by_arm.png'}")
     except ImportError:
         pass
 

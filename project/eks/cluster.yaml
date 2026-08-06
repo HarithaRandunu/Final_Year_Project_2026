@@ -1,0 +1,133 @@
+# eksctl cluster config for Phase 10.
+#
+#   eksctl create cluster -f cluster.yaml      (~15-20 min)
+#   eksctl delete cluster -f cluster.yaml      (run teardown.ps1 instead - it verifies)
+#
+# Region, AZs and version are filled in (ap-south-1 / 1.34, chosen 2026-07-30).
+# Confirm the AZ names exist for this account before the first create - AZ
+# names are per-account aliases, so ap-south-1a is not guaranteed to be offered
+# to every account:
+#   aws ec2 describe-availability-zones --region ap-south-1 \
+#     --query "AvailabilityZones[].ZoneName" --output text
+#
+# NOTE ON EDITOR WARNINGS: an IDE may flag apiVersion/kind/metadata/
+# managedNodeGroups/cloudWatch as "not allowed". That is the editor applying a
+# KUBERNETES schema to this file. It is not a Kubernetes manifest - it is an
+# eksctl ClusterConfig, and `eksctl utils schema` confirms every property used
+# here is valid. Ignore those warnings; do not "fix" them.
+---
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: fyp-autoscaling
+  region: ap-south-1                # Mumbai - chosen 2026-07-30, closest to Sri Lanka
+  # eksctl 0.229.0's own default, so it is a version this eksctl supports.
+  # module2_scheduler/deployment.yaml pins kube-scheduler:v1.34.x to match -
+  # after the cluster is up, confirm the exact patch level with
+  #   kubectl version -o json | jq -r .serverVersion.gitVersion
+  # and set the image tag to it.
+  version: "1.34"
+
+# EKS requires control-plane subnets in at least TWO availability zones - a
+# genuinely single-AZ cluster is not possible. The VPC therefore spans two,
+# while the node group below is pinned to one (see its comment).
+availabilityZones:
+  - ap-south-1a
+  - ap-south-1b
+
+managedNodeGroups:
+  - name: workers
+    # Four nodes, and deliberately NOT autoscaled: min == max == desired.
+    #
+    # Four because Module 2 is a node-scoring bandit. On kind it had 2
+    # candidate nodes against 371 in offline validation, which is the
+    # documented reason its live results were inconclusive. Four gives it
+    # something to differentiate, and makes the induced rank-inversion
+    # experiment meaningful (degrade the favourite, three alternatives
+    # remain), while keeping enough placement events per node for the
+    # posteriors to converge - more nodes would spread the pulls too thin.
+    #
+    # Fixed size because a node set that changes under the bandit would
+    # invalidate its posteriors mid-experiment. Do not add the cluster
+    # autoscaler to this cluster.
+    minSize: 4
+    maxSize: 4
+    desiredCapacity: 4
+
+    # m5.large, NOT t3.large - changed 2026-07-30 before first create.
+    #
+    # Same 2 vCPU / 8 GiB, so the allocatable arithmetic below is unchanged,
+    # but m5 is NOT burstable. t3 runs on CPU credits and throttles to a ~20-30%
+    # baseline once they are exhausted. The baseline and m3_only arms scale on
+    # CPU utilisation, so credit depletion partway through a run would suppress
+    # the very signal being measured - and it would do so invisibly, looking
+    # like the application coping rather than the instance being throttled.
+    # That is a measurement-integrity problem, not a performance preference.
+    #
+    # Deliberately a single instance type. A second type (m5a.large) would
+    # improve spot availability, but m5a is AMD where m5 is Intel, and Module 2
+    # SCORES NODES - systematically different per-node CPU performance would be
+    # learned by the bandit as node quality, confounding the experiment. If spot
+    # capacity for m5.large fails in this AZ, adding m5a.large is the fallback,
+    # but note the heterogeneity in the results if you do.
+    #
+    # Arithmetic from the real manifests:
+    #   TeaStore at 1 replica each (7 services) ....... 7.25 GiB
+    #   framework components (4) ...................... 0.56 GiB
+    #   metrics-server + KEDA + scheduler + k6 + UI ... ~1.5 GiB
+    #   +5 extra teastore-webui replicas @ 1536Mi ..... +7.5 GiB
+    #                                                   ---------
+    #   at maxReplicas=6 .............................. ~16.8 GiB
+    # 4 x t3.medium is 16 GiB raw but only ~12.8 GiB allocatable after EKS
+    # node overhead - scale-up would stall on Pending pods, destroying the
+    # exact measurement this cluster exists to take. 4 x t3.large gives
+    # ~28 GiB allocatable.
+    instanceTypes:
+      - m5.large
+    # TEMPORARILY false - 2026-07-30 21:32. First create attempt (spot: true)
+    # failed for 27 min with zero ASG instances launched; CloudTrail showed
+    # every RunInstances call rejected with "Client.InvalidParameterCombination:
+    # the specified instance type is not eligible for Free Tier" - this AWS
+    # account is currently Free-Tier-restricted. Testing whether that
+    # restriction is Spot-specific (a known AWS anti-abuse pattern for new
+    # accounts) or account-wide. If On-Demand also fails, this is a hard
+    # account-level block, not an engineering problem - revert this and stop.
+    spot: false
+
+    # Pinned to one AZ. Not for cost (cross-AZ transfer at this volume is
+    # pennies) but for validity: nodes split across AZs have systematically
+    # different inter-pod latency, which Module 2's bandit would learn as a
+    # node-quality difference and confound the induced-inversion experiment.
+    availabilityZones:
+      - ap-south-1a
+
+    volumeSize: 30
+    volumeType: gp3
+    privateNetworking: false   # public subnets + IGW; no NAT gateway charge
+
+    labels:
+      role: workload
+    tags:
+      project: fyp-autoscaling
+      phase: "10"
+
+    iam:
+      withAddonPolicies:
+        cloudWatch: true
+
+# vpc-cni / coredns / kube-proxy are installed by eksctl automatically.
+# metrics-server and KEDA are NOT EKS add-ons - they come from our own
+# manifests in bootstrap (see README.md step 5).
+cloudWatch:
+  clusterLogging:
+    enableTypes: []   # cluster logging costs money and we do not read it
+
+# Caught by `eksctl create cluster --dry-run` on 2026-07-30, before creating
+# anything: eksctl defaults to a NAT gateway (~$0.045/hr) even though our node
+# group is public (privateNetworking: false above) and never needs one - the
+# comment on that line asserted "no NAT gateway charge" but nothing here
+# actually enforced it. Explicit Disable, verified by dry-run below.
+vpc:
+  nat:
+    gateway: Disable
