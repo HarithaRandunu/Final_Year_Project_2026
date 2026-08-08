@@ -32,10 +32,10 @@ There is no repo-root build/lint/test setup, and no repo-root `.git` — the `im
 **Optional features beyond the core deliverable — both now built, neither required for submission.** They live on the `phase8-dashboard` branch and are **not yet merged** into `integration`/`main`:
 
 1. **Phase 8 — Streamlit dashboard** (`project/dashboard/`). Offline results views plus a one-shot "what-if" panel. Built 2026-07-29. **Superseded as the primary UI, but left in place and untouched** — don't delete it; its exit criteria are still independently verifiable.
-2. **Phase 9 — the control-center application** (`project/desktop_app/`, run with `python project/desktop_app/main.py`). A FastAPI + vanilla-JS app that supersedes the dashboard: it installs the prerequisite tools and bootstraps the whole live cluster without the user typing a command, lets the framework be pointed at **any** application (a preset, an existing Deployment, or a user-supplied manifest — building from source is explicitly out of scope), shows the three modules' live state while traffic flows, and still serves all Phase 2–7 results plus eight new Mermaid diagrams. Built 2026-07-29 → 2026-07-30.
+2. **Phase 9 — the results/reporting web app** (`project/desktop_app/`, run with `python project/desktop_app/main.py`). A FastAPI + vanilla-JS app that supersedes the dashboard. **Narrowed on 2026-08-07 from a live cluster-driving control center to a read-only results viewer**, then had a narrower live view added back the same day. It still never installs tools, bootstraps a cluster, or switches target apps. Three pages: Results (Phase 2–4 training/validation, both live ablation studies side by side — `project/results/` at replica ceiling 2 and `project/results_v2/` at ceiling 3, see `docs/Results_v2_Study_Report_MultiSignal_Autoscaling.md` — every stat captioned with a plain-language explanation and, where a value is missing, why); Live Comparison (gauges + charts reading a cluster the user started manually, compared against one **recorded** baseline trial rather than a genuinely simultaneous live run — baseline and the full framework can't both run live at once in this cluster design, since they'd share one TeaStore deployment and the cluster can only be in one scheduler mode at a time); and Project Overview (detailed plain-language project explanation plus six Mermaid architecture/methodology diagrams). Built 2026-07-29 → 2026-07-30; narrowed 2026-08-07; live view + explanations + detailed overview added 2026-08-07.
    - **It is a web app, not a desktop app, despite the folder name.** Built first as a `pywebview` native window, then converted to a local web application on 2026-07-30 at the user's request. The folder name was deliberately left as `desktop_app` so existing references keep resolving; the original native-window launcher is retained and still working as `main_desktop.py`. If the folder is ever renamed, update this file, both planning docs, and `project/desktop_app/README.md` in the same pass.
-   - **It binds `127.0.0.1` only, and refuses a non-loopback bind without `--allow-remote`.** Deliberate, and not to be "simplified" away: the app has no authentication, and its endpoints install software, rebuild clusters, and apply arbitrary manifests. It also rejects foreign `Host` headers and cross-origin requests — that is what stops a remote web page from driving this cluster through the user's own browser.
-   - **Read `docs/Progress_Trace_MultiSignal_Autoscaling.md`'s Phase 9 section before changing anything under `project/desktop_app/`** — it records the scope decisions, the bugs found by actually running it, and one unexplained cluster state that a confirmation guard now prevents.
+   - **It binds `127.0.0.1` only, and refuses a non-loopback bind without `--allow-remote`.** Kept even though the app has no cluster-mutating endpoint (the Live Comparison page only reads — `kubectl port-forward` plus `GET` requests to each component's own `/state`, never a PATCH) — it's still the guard against a remote page reading local results/live data through the user's own browser via DNS rebinding.
+   - **Read `docs/Progress_Trace_MultiSignal_Autoscaling.md`'s Phase 9 section before changing anything under `project/desktop_app/`** — it records the original scope decisions, the bugs found by actually running it, one unexplained cluster state that a confirmation guard used to prevent (from when the app still touched a cluster), the 2026-08-07 scope-narrowing, and the same-day live-view addition.
 
 The habit that made both cheap to build: every module's validation code writes structured JSON/plot output rather than console-only text. Keep it that way. If you're adding validation code and don't see that requirement, check `docs/Full_Plan_MultiSignal_Autoscaling.md` §13 before assuming it's out of scope.
 
@@ -68,13 +68,16 @@ implementation/
 │   ├── live_cluster/                   #   Phases 5–6 — kind cluster, 4 components, ablation harness
 │   ├── phase7_analysis/                #   Phase 7 — statistical analysis
 │   ├── dashboard/                      #   Phase 8 (optional) — Streamlit; superseded, kept
-│   ├── desktop_app/                    #   Phase 9 (optional) — the primary UI; a WEB app despite the name
-│   ├── results/                        #   all committed metrics JSON + plots every UI reads
+│   ├── desktop_app/                    #   Phase 9 (optional) — results viewer + live comparison, all read-only against the cluster; a WEB app despite the name
+│   ├── results/                        #   original 25-trial ablation study (replica ceiling 2) + Phase 2-4 training results
+│   ├── results_v2/                     #   follow-up 25-trial ablation study (replica ceiling 3, dedicated cloud VM) — ablation only, no training data
 │   └── configs/, data/, tests/, requirements.txt
 └── docs/
     ├── Full_Plan_MultiSignal_Autoscaling.md
     ├── Phase_Plan_MultiSignal_Autoscaling.md
     ├── Progress_Trace_MultiSignal_Autoscaling.md
+    ├── Results_v2_Study_Report_MultiSignal_Autoscaling.md
+    ├── Hetzner_VM_Manual_Ops_Runbook_MultiSignal_Autoscaling.md
     ├── Preprocessing_Manual_MultiSignal_Autoscaling.md
     ├── Phase6_Ablation_Design.md
     └── [Research_*, Literature_*, Source_Evaluations*, Full_Research_Structure*, Full_Project_Report*.docx]
@@ -123,17 +126,18 @@ python project/module2_co_scheduling/validate.py
 python project/module3_adaptive_control/validate.py
 python project/integration/simulated_closed_loop.py
 
-# Phases 5–6 — live cluster. project/live_cluster/README.md is the full runbook;
-# the desktop app (below) automates all of it.
+# Phases 5–6 — live cluster. project/live_cluster/README.md is the full runbook
+# (manual, since the desktop app below no longer automates it).
 python project/live_cluster/ablation/run_trial.py --arm full --tag scaleup1_t1
 
-# Phase 7 — statistical analysis of the 25 ablation trials
+# Phase 7 — statistical analysis of the 25 ablation trials. --results-dir/
+# --output-dir/--tag-prefixes let it target results_v2 too (see below).
 python project/phase7_analysis/statistical_analysis.py
+python project/phase7_analysis/statistical_analysis.py --results-dir project/results_v2/ablation --output-dir project/results_v2/phase7 --tag-prefixes v2_t
 
-# Phase 9 (optional) — the control-center web app. Serves http://127.0.0.1:8877
-# and opens a browser tab. Has its own venv; needs no cluster to show results
-# and diagrams, and builds the cluster itself for the live views. Ctrl+C stops
-# it and tears down the port-forwards.
+# Phase 9 (optional) — the results/reporting web app. Serves http://127.0.0.1:8877
+# and opens a browser tab. Read-only: never touches a cluster, just serves
+# project/results/ and project/results_v2/ off disk. Ctrl+C stops it.
 python project/desktop_app/main.py
 python project/desktop_app/main_desktop.py   # the original native-window mode
 

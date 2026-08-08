@@ -1,8 +1,0 @@
-flowchart LR
-    events["Real placement events\n(MSResource churn, 87 events / 371 candidate nodes)"]
-    sim["Simulated candidate sampling\n+ discounted Thompson Sampling\nposterior update loop ⭐\n(discount factor gamma on alpha/beta)"]
-    val["Offline validation (Phase 3A)\nregret vs. oracle/random/heuristic-only,\ndiscounted-vs-vanilla ablation,\nsynthetic rank-inversion addendum"]
-    state["final_bandit_state.json\n(350 nodes' alpha/beta/pulls, exported)"]
-    live["Live port: module2_extender/app.py\nkube-scheduler extender webhook\n(/filter, /prioritize) + live reward tracker\n(node CPU/memory headroom)"]
-
-    events --> sim --> val --> state --> live

@@ -1,9 +1,0 @@
-flowchart LR
-    trace["Alibaba cluster-trace-microservices-v2021\n(Node, MSResource, MSRTQps, MSCallGraph)"]
-    prep["Phase 1 preprocessing\nlabeled feature table\n(p95/p99 latency, MCR/RT, CPU/mem,\nrolling deltas, violation_now label)"]
-    train["LightGBM training\n+ TreeSHAP attribution ⭐"]
-    val["Offline validation (Phase 2)\nwalk-forward AUC-ROC/AUC-PR,\ncalibration, lead-time comparison,\nSHAP sanity check"]
-    model["model_primary.joblib\n(exported)"]
-    live["Live port: module1_controller/app.py\nreal probe + K8s metrics substituted\nfor Alibaba's own signal columns\n(disclosed approximations, see its docstring)"]
-
-    trace --> prep --> train --> val --> model --> live

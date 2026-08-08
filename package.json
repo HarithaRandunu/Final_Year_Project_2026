@@ -1,0 +1,10 @@
+{
+  "name": "fyp-implementation-scripts",
+  "private": true,
+  "description": "Root-level convenience scripts. Not a Node project itself - project/webapp is the only real Node package here; this just lets it be run from the implementation/ root without cd'ing into project/webapp first.",
+  "scripts": {
+    "webapp": "npm exec --prefix project/webapp -- next dev -p 8878 -H 127.0.0.1",
+    "webapp:build": "npm --prefix project/webapp run build",
+    "webapp:start": "npm exec --prefix project/webapp -- next start -p 8878 -H 127.0.0.1"
+  }
+}

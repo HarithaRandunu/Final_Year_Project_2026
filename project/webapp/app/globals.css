@@ -1,0 +1,200 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /* Page background is a soft cream, not bright white - and sits a step
+     below card so cards visibly lift off it, instead of the flat
+     pure-white-on-white the shadcn "neutral" preset ships with. Zero chroma
+     anywhere plus that flatness is what read as "so bright" / "just plain
+     dark and white". */
+  --background: oklch(0.974 0.007 85);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(0.995 0.004 85);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(0.995 0.004 85);
+  --popover-foreground: oklch(0.145 0 0);
+  /* Deliberately no gradient wash in light mode (see body rule below) - the
+     colored glows that work as a subtle atmosphere against a near-black
+     dark background read as visible, uneven blotches against a light one.
+     A flat, smooth, warm cream is the "another way" for light mode: no
+     gradient, no chroma-zero white either. Don't reintroduce a light-mode
+     background-image without checking with the user first. */
+  /* Primary carries real hue now (the same blue used as "baseline" in the
+     ablation-arm palette, lib/colors.ts) instead of near-black - this is
+     what colors every default button, active nav link, and step-number
+     badge across the whole app. */
+  --primary: oklch(0.549 0.176 258.6);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.94 0.03 258.6);
+  --accent-foreground: oklch(0.32 0.1 258.6);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.911 0 0);
+  --input: oklch(0.911 0 0);
+  --ring: oklch(0.549 0.176 258.6 / 55%);
+  /* Categorical chart palette - same five hues/order as the ablation-arm
+     colors (lib/colors.ts): blue, orange, aqua, yellow, magenta. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.549 0.176 258.6);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  /* Diagram accent tones - same five categorical hues, exposed as their own
+     tokens so hand-authored SVG diagrams (currentColor-only otherwise) can
+     give each component an identity color instead of a uniform neutral box. */
+  --viz-blue: #2a78d6;
+  --viz-orange: #eb6834;
+  --viz-aqua: #1baf7a;
+  --viz-yellow: #eda100;
+  --viz-magenta: #e87ba4;
+}
+
+.dark {
+  /* Black stays the dominant tone (kept very low lightness) - the gradient
+     only adds a faint blue/violet glow on top via the body rule, it doesn't
+     lighten the base the way the light-mode cream does. */
+  --background: oklch(0.16 0.012 258);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.218 0.014 258);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.218 0.014 258);
+  --popover-foreground: oklch(0.985 0 0);
+  /* Six glows, six different hues, deliberately placed off the exact
+     corners at uneven sizes/positions rather than a mirrored symmetric
+     layout - reads more like a natural aurora than a repeated pattern.
+     Dark-mode only: black stays the dominant tone (base --background stays
+     very low-lightness), this is a wash on top of it, not a replacement
+     for it. */
+  --bg-glow-1: oklch(0.34 0.09 258 / 42%); /* blue */
+  --bg-glow-2: oklch(0.32 0.09 45 / 28%); /* orange */
+  --bg-glow-3: oklch(0.3 0.07 165 / 34%); /* aqua */
+  --bg-glow-4: oklch(0.32 0.08 90 / 30%); /* gold */
+  --bg-glow-5: oklch(0.3 0.09 10 / 26%); /* magenta/pink */
+  --bg-glow-6: oklch(0.3 0.08 300 / 28%); /* violet */
+  --primary: oklch(0.639 0.166 258.6);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.3 0.06 258.6);
+  --accent-foreground: oklch(0.9 0.05 258.6);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.639 0.166 258.6 / 55%);
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.639 0.166 258.6);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+  --viz-blue: #3987e5;
+  --viz-orange: #d95926;
+  --viz-aqua: #199e70;
+  --viz-yellow: #c98500;
+  --viz-magenta: #d55181;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply text-foreground;
+    /* Light mode: flat smooth cream, no gradient - see the :root comment
+       above for why. Dark mode overrides this with a six-color gradient
+       wash below. */
+    background-color: var(--background);
+  }
+  .dark body {
+    /* Six fixed radial glows at uneven, non-mirrored positions/sizes, each
+       a different hue - a genuinely multi-directional gradient rather than
+       a repeated corner pattern. Fixed attachment so it reads as one
+       continuous backdrop behind scrolling content, not a texture that
+       repeats per screen height. */
+    background-image:
+      radial-gradient(1100px circle at 84% -12%, var(--bg-glow-1), transparent 55%),
+      radial-gradient(760px circle at 6% 24%, var(--bg-glow-2), transparent 58%),
+      radial-gradient(950px circle at 70% 118%, var(--bg-glow-3), transparent 55%),
+      radial-gradient(680px circle at -8% 64%, var(--bg-glow-4), transparent 58%),
+      radial-gradient(820px circle at 112% 58%, var(--bg-glow-5), transparent 55%),
+      radial-gradient(720px circle at 28% 106%, var(--bg-glow-6), transparent 58%);
+    background-attachment: fixed;
+  }
+  html {
+    @apply font-sans;
+    /* Bumped from the browser default 16px - the shadcn defaults read a
+       little small for a document-heavy report/dashboard app. Being a root
+       rem base, this scales every Tailwind rem-sized utility (text size,
+       spacing, radii) along with it, rather than needing every component
+       tuned individually. */
+    font-size: 18px;
+  }
+}
