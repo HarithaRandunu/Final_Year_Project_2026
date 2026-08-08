@@ -96,6 +96,7 @@ export function LiveDashboard() {
 
   const clusterReachable = state?.clusterReachable ?? false;
   const risk = state?.module1.data?.predicted_risk ?? null;
+  const m3RiskValue = state?.module3.data?.predicted_risk ?? null;
   const threshold = state?.module3.data?.threshold ?? null;
   const replicas = state?.actuator.data?.replicas ?? null;
   const module2Value = bestNodePosteriorMean(state);
@@ -202,6 +203,31 @@ export function LiveDashboard() {
 
         <div className="space-y-3">
           <Speedometer
+            label="Risk Module 3 is reacting to"
+            value={m3RiskValue}
+            min={0}
+            max={1}
+            tone="var(--viz-yellow)"
+            unavailableReason={m3RiskValue === null ? "no live reading" : undefined}
+          />
+          <MultiLineChart
+            label="Risk as last seen by Module 3, over time"
+            min={0}
+            max={1}
+            emptyReason="Waiting for live readings from Module 3."
+            series={[{ label: "Risk seen by Module 3 (~2min polls)", color: "var(--viz-yellow)", values: m3RiskLive }]}
+          />
+          <p className="text-xs text-muted-foreground">
+            <strong className="text-foreground">This is the input, the gauge below is the
+            output:</strong> this is Module 1&apos;s risk score, but only as of Module 3&apos;s
+            own last ~2-minute poll — not the faster 2-second reading shown in the Module 1
+            block. It&apos;s the only risk value the PI controller below ever actually sees.
+            Compare its line to the threshold line below: while this stays under 0.10, the
+            threshold keeps climbing; the moment this line crosses above 0.10, expect the
+            threshold to start coming back down on its next cycle.
+          </p>
+
+          <Speedometer
             label="Alert threshold (Module 3)"
             value={threshold}
             min={MODULE3_THRESHOLD_BOUNDS[0]}
@@ -219,8 +245,8 @@ export function LiveDashboard() {
           <p className="text-xs text-muted-foreground">
             <strong className="text-foreground">What this is:</strong> a proportional-integral
             (PI) controller — the same one validated offline on the Results page — nudging this
-            threshold every ~2-minute cycle to keep the risk value it observes (the yellow line
-            to the left) near a target of 0.10. When observed risk sits below target it raises
+            threshold every ~2-minute cycle to keep the risk value it observes (the gauge and
+            chart above) near a target of 0.10. When observed risk sits below target it raises
             the threshold, making the system more tolerant before it would alert; when risk
             sits above target it lowers it, making the system stricter. How far it&apos;s
             allowed to move in a single step isn&apos;t fixed — it narrows automatically when
