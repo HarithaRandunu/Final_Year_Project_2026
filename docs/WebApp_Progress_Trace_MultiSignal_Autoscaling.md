@@ -1155,6 +1155,92 @@ oscillation widening when the threshold itself has been reversing direction), an
 case. Verified: `tsc`/lint clean, deployed to the VM, confirmed via curl that `/live`'s
 rendered HTML now contains the new paragraph.
 
+### New page — Knowledge (what each module remembers, and where it lives in the code)
+
+User asked, separately from any bug report: does this system have a "knowledge base," given
+the MAPE-K framing used throughout `docs/` to describe the architecture (Monitor-Analyze-
+Plan-Execute-**Knowledge**)? Answered first in chat (no single shared component - each
+module maintains its own private state, and shares only specific pieces with the others),
+then asked to build it as a real page rather than leave it as a chat answer, then to draw
+it as a 2D diagram rather than a 3D scene (recommended against 3D explicitly: it would need
+a new dependency this app has deliberately avoided everywhere else, and a 3-node structure
+this small is genuinely easier to read flat than orbited), then to add a literal code-level
+mapping on top of the diagram.
+
+Built `app/knowledge/page.tsx` + `components/knowledge-diagram.tsx` (hand-authored inline
+SVG, same primitives as `architecture-diagram.tsx` - no new library). Traced every claim to
+source before writing it: Module 1's rolling history (`module1_controller/app.py:165`,
+`self.history: deque[dict] = deque(maxlen=HISTORY_LEN)`), Module 2's per-node Beta beliefs
+(`module2_extender/app.py:73-102`, the `ThompsonSamplingBandit` class - confirmed via a live
+`/state` curl showing real `alpha`/`beta`/`pulls` values, not just reading the class
+definition), Module 3's integral term/score history/threshold trajectory
+(`module3_controller/app.py:81/106/153`). Caught and fixed one real off-by-one before
+publishing (`self.integral = 0.0` is line 81, not 82 as first written) by re-reading the
+exact line after drafting the content rather than trusting the earlier read from memory.
+
+Added a "Mapped to the code, line by line" table (one row per piece of knowledge, `Module |
+What it maintains | Where in the code`) directly answering "tell me where the knowledge base
+is in the code" literally, on top of the diagram rather than replacing it. Verified:
+`tsc`/lint clean, non-ASCII sweep clean, deployed to the VM, confirmed via curl that the
+rendered page contains the table heading and both cited line numbers, and that all other
+routes still return 200 (nav bar was a shared-file edit).
+
+### New page — Data Pipeline (the Alibaba trace through to three trained, validated modules)
+
+User asked for a full walkthrough: the dataset, how each module's data is actually prepared,
+how each is trained, and how each is validated - "with diagram" and "use some codes from
+the codebase to prove." Built as `app/data-pipeline/page.tsx`, with a new
+`components/pipeline-diagram.tsx` (a fifth hand-authored SVG diagram, same pattern as the
+other four) and a new small `components/code-snippet.tsx` (plain `<pre>`/`<code>`, no
+syntax-highlighting library - same "no new dependency for something this small" principle
+as everywhere else).
+
+Every fact was traced to source, not recalled from memory, including re-reading files
+already read earlier in the session in case line numbers had drifted:
+`preprocessing/build_features.py` for the latency-signal/label/split code (confirmed the
+label is self-referential and forward-shifted, and the split is strictly time-ordered -
+`time_based_split()`, no shuffle); `module2_co_scheduling/bandit.py` for the discounted
+posterior update; `module3_adaptive_control/{pi_controller,conformal}.py` for the
+reversal-count/widening functions (the *original* module files, not the live-cluster copies
+this time, since this page is specifically about offline training/validation).
+
+**One real correction made to the diagram's own scope while building it**: the initial plan
+included a Module 2 -> Module 3 arrow (bandit state), copied by habit from the Knowledge
+page's diagram. Checked `module3_adaptive_control/validate.py` directly before drawing it -
+its `run_arm()` only calls `load_holdout_residual_stream()` (Module 1's output), no Module 2
+dependency anywhere in offline validation. That link is live-cluster-only (Phase 5+,
+reporting only, not fed into training). Removed it before the diagram was ever shown,
+rather than drawing a connection that doesn't exist in the pipeline this page is actually
+about.
+
+Reported every module's validation honestly, including the failing criteria alongside the
+passing ones (`StatusBadge status="pass"` vs `"disclosed"`, matching the exact convention
+already used in `components/results/module3-section.tsx` - checked that file first rather
+than inventing new status semantics): Module 1's lead-time comparison did not beat its
+baseline on real data; Module 2's discounted-vs-vanilla comparison lost on the real trace's
+one non-stationary window; Module 3's real-data three-way comparison tied at 4 reversals
+each. Each is paired with its synthetic-addendum test, which passed with real reported
+numbers (Wilcoxon p-values, win rates) pulled directly from
+`results/module2/synthetic_rank_inversion.json` and `results/module3/synthetic_multi_burst.json`,
+not approximated.
+
+**A second real bug caught during writing, this time a font-glyph issue, not a logic one**:
+Unicode superscript minus digits, a Unicode multiplication sign instead of a plain `x`, and
+a Unicode approximately-equals sign instead of `~=` all made it into the first draft's
+real-number citations (e.g. writing a p-value as "9x10 to the -16").
+These are exactly the class of character already known this session to fall outside Geist's
+loaded glyph subset (the `§`/`≈`/`→`/`γ` bug from earlier in this project). Caught by the
+same non-ASCII sweep script used every time since - re-ran it, found 3 more hits than the
+first pass (the sweep only catches what's actually still in the file, so this really was a
+second, separate slip, not a re-detection of the same one) - replaced with plain ASCII
+("Wilcoxon p under 0.0001", "CPU x memory-headroom").
+
+Added `/data-pipeline` to the nav bar, between Knowledge and TeaStore. Verified: `tsc`/lint
+clean, non-ASCII sweep clean across all six touched files, local render test confirmed the
+diagram SVG, all `CodeSnippet` source labels, and the Phase 4 section text all present,
+deployed to the VM, confirmed via curl, and re-checked all eight routes return 200 (a second
+shared-file edit, same nav bar).
+
 ---
 
 ## Phase 7 — Polish & cross-cutting
