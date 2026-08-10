@@ -304,18 +304,32 @@ def main(argv: list[str] | None = None) -> None:
         fig.savefig(results_dir / "calibration.png")
         plt.close(fig)
 
-        # Walk-forward fold AUC-PR comparison
+        # Walk-forward fold AUC-PR comparison. A fold's test window can have
+        # zero violations, in which case safe_auc() returns None (AUC-PR is
+        # undefined with only one class present) - plot those as a visible,
+        # labeled gap rather than letting matplotlib silently drop the point
+        # and truncate the x-axis before the last fold.
         folds = wf["folds"]
         fig, ax = plt.subplots(figsize=(7, 4))
         xs = [f["fold"] for f in folds]
-        ax.plot(xs, [f["fused_auc_pr"] for f in folds], "o-", label="fused")
-        ax.plot(xs, [f["baseline_auc_pr"] for f in folds], "o-", label="CPU-only baseline")
+        nan = float("nan")
+        ax.plot(xs, [f["fused_auc_pr"] if f["fused_auc_pr"] is not None else nan for f in folds], "o-", label="fused")
+        ax.plot(xs, [f["baseline_auc_pr"] if f["baseline_auc_pr"] is not None else nan for f in folds], "o-", label="CPU-only baseline")
+        no_violation_folds = [f["fold"] for f in folds if f["fused_auc_pr"] is None]
+        for fold_x in no_violation_folds:
+            ax.axvline(fold_x, color="grey", linestyle=":", linewidth=1, alpha=0.6)
+            ax.text(
+                fold_x, -0.12, "no\nviolations",
+                transform=ax.get_xaxis_transform(),
+                ha="center", va="top", fontsize=7.5, color="grey",
+            )
+        ax.set_xticks(xs)
         ax.set_xlabel("walk-forward fold")
         ax.set_ylabel("AUC-PR")
         ax.set_title(f"Walk-forward AUC-PR by fold - {args.tag}")
         ax.legend()
         fig.tight_layout()
-        fig.savefig(results_dir / "walk_forward_auc_pr.png")
+        fig.savefig(results_dir / "walk_forward_auc_pr.png", bbox_inches="tight")
         plt.close(fig)
 
         print(f"Saved plots to {results_dir}")

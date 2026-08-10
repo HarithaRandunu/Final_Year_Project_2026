@@ -6,7 +6,7 @@
     "fused_brier": 0.012347326257544962,
     "baseline_auc_roc": 0.4269662921348315,
     "baseline_auc_pr": 0.019230769230769232,
-    "baseline_brier": 0.014329574089550186,
+    "baseline_brier": 0.014329574089550184,
     "note": "Single-holdout AUC-PR is high-variance here given how few positives the test split has; treat the walk-forward mean below as the more reliable estimate."
   },
   "walk_forward": {
