@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { HeadlineComparison } from "@/components/conclusion/headline-comparison";
 import { StatusBadge } from "@/components/status-badge";
+import { InfoNote } from "@/components/empty-state";
 
 const DISCLOSED_FINDINGS = [
   {
@@ -89,6 +90,44 @@ export default function ConclusionPage() {
             costReductionPct={61}
           />
         </div>
+        <InfoNote>
+          <p className="font-medium text-foreground">How these numbers were calculated</p>
+          <ul className="mt-2 list-disc space-y-1.5 pl-4">
+            <li>
+              Both percentages are the mean <strong className="text-foreground">time spent
+              over-provisioned</strong> across 5 independently-run trials of the relevant
+              configuration: the share of a trial&apos;s 30-second polling samples where the
+              system was in an alert state (predicted risk or CPU above the current threshold)
+              while no real SLA violation was actually occurring at that same moment —
+              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">alert AND NOT
+              actual_violation</code>, averaged over the trial. &quot;Control only&quot; is the{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">m3_only</code> arm
+              (Module 3&apos;s controller reacting to raw CPU); &quot;Integrated&quot; is the{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">full</code> arm — the
+              same controller, reacting to Module 1&apos;s fused risk score instead. That one
+              substitution is the only thing that differs between the two numbers.
+            </li>
+            <li>
+              Cost is <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+              cost_proxy_pod_seconds</code>: the live replica count at each 30-second poll,
+              summed across the whole trial — a running total of pod-seconds actually consumed,
+              not an estimate of CPU-time or request cost.
+            </li>
+            <li>
+              Every figure above is a mean of 5 real trials per configuration (25 live trials
+              per study in total), computed from each trial&apos;s own recorded{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">metrics.json</code> by{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+              phase7_analysis/statistical_analysis.py</code> — not simulated or interpolated.
+              Full significance testing for these and every other metric (Kruskal-Wallis omnibus
+              tests, Benjamini-Hochberg-corrected pairwise comparisons, effect sizes, and the
+              small-sample power caveat) is on the{" "}
+              <a href="/results" className="underline underline-offset-2 hover:text-foreground">
+                Results page&apos;s Ablation Study tab
+              </a>.
+            </li>
+          </ul>
+        </InfoNote>
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="pt-6 text-sm text-foreground">
             This result is not produced by any single component acting alone. It comes from

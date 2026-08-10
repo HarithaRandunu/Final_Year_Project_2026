@@ -1243,6 +1243,249 @@ shared-file edit, same nav bar).
 
 ---
 
+**Chart zoom + conclusion-page calculation disclosure (2026-08-10).** Two user requests,
+handled together: (1) charts across the app — mostly the Live section's — needed to be
+user-zoomable; (2) the Final Conclusion page's central-result numbers (57.8%->2.2% primary,
+87.2%->14.1% follow-up, plus the cost figures) needed to show how they were actually
+calculated, not just state them.
+
+`components/live/multi-line-chart.tsx` (shared by all 7 charts on `/live` and all 3 on
+`/teastore` - one component, no per-usage opt-in needed): added user-controlled time-axis
+zoom, hand-rolled with no charting library (consistent with the rest of this app's SVG
+components) - +/-/reset buttons plus mouse-wheel-over-the-plot, both anchored at a real point
+in time (cursor position for wheel, window center for the buttons) rather than always
+re-centering on the whole history. Required: converting the file to `"use client"` (it was
+previously a plain presentational component, safe to convert since both call sites already
+sit inside a client boundary or accept a client child from a server component); a `<clipPath>`
+around the polylines, since points outside a zoomed window now map outside the plot's pixel
+bounds (previously always true only for the y-axis, which was already clamped - x wasn't);
+`computeEndLabels` changed to use each series' last point *within* the visible window rather
+than its true last point, so the end-of-line value label stays meaningful and on-screen when
+zoomed into an earlier span; `autoFitDomain` (the existing y-axis auto-fit used by the Module 2
+chart) extended to rescope to only the visible window's data when x-zoomed, so zooming into a
+busy period also zooms the value scale to it, not just the time scale.
+
+`app/conclusion/page.tsx`: added an `InfoNote` directly below the two `HeadlineComparison`
+cards, before the existing "not produced by any single component" card, explaining the exact
+calculation behind both numbers - re-derived from source, not paraphrased: over-provisioning %
+is the mean per-trial fraction where `alert AND NOT actual_violation` (verified against
+`module3_adaptive_control/validate.py`'s and `live_cluster/ablation/metrics_common.py`'s
+`compute_elasticity_metrics`, which agree exactly), and cost is `cost_proxy_pod_seconds` - the
+polled replica count summed across the trial (verified against
+`live_cluster/ablation/run_trial.py`'s `build_metrics`) - plus that both are means of 5 real
+trials per arm, computed by `phase7_analysis/statistical_analysis.py`, with a link to the
+Results page's Ablation tab for full significance testing.
+
+Verified: `tsc --noEmit` clean, `eslint .` clean, non-ASCII sweep clean on both changed files,
+local render test on the already-running dev server (port 8880, not one I started) confirmed
+all 7 zoom-button triplets on `/live` and 3 on `/teastore`, and the new calculation text
+rendering un-garbled on `/conclusion`. Deployed to the VM via the same two files (Fast Refresh
+picked them up, no restart needed), `tsc --noEmit` re-run clean on the VM, curl-verified the
+same zoom-button and calculation-text counts server-side, and re-checked all eight routes
+return 200.
+
+---
+
+**Follow-up study (ceiling 3) ablation data missing on the VM (2026-08-10).** User reported
+the Results page's Ablation Study Results tab showed no follow-up-study (`results_v2`, replica
+ceiling 3) data. Root cause was not a code bug - `app/results/page.tsx` and
+`components/results/ablation-study-panel.tsx` were already correct, and correctly fell back to
+an empty state when data was missing. The VM had all 25 raw
+`results_v2/ablation/*/metrics.json` trial files but was missing the aggregated
+`results_v2/phase7/` output (`statistical_analysis.json`, `trial_level_data.csv`,
+`metric_distributions_by_arm.png`) that `phase7_analysis/statistical_analysis.py` produces from
+those trials - it had been generated locally earlier this session but never uploaded. Fixed by
+deploying the already-verified local `results_v2/phase7/` folder to the identical path on the
+VM via `tar czf | ssh fyp-hetzner`. Verified on the VM: file sizes match, `statistical_analysis.json`
+parses as valid JSON with `metadata.n_trials_total == 25`, `trial_level_data.csv` has 26 lines
+(1 header + 25 trials), permissions readable (644). Not independently re-confirmed by rendering
+the interactive follow-up tab itself (this app's tabs only render their active panel
+server-side, so `curl` cannot see inside an inactive nested tab) - asked the user to confirm
+visually since the same component already renders the original study correctly with the
+identical file shape.
+
+---
+
+**Data Pipeline page: display the real preprocessed data, not just describe it (2026-08-10).**
+User asked to display the actual preprocessed data for the "2 datasets" the page already
+described in prose - Module 1's feature table and Module 2's placement-event table. Added a
+new "Preprocessed data - real rows, both datasets" section to `app/data-pipeline/page.tsx`,
+between the pipeline diagram and the Module 1 validation section, rendering real rows from disk
+via the existing `readCsv()` helper (`lib/data.ts`) and a new `DATA_PROCESSED_DIR` constant in
+`lib/config.ts`:
+
+- Module 1: first 8 of 360 rows from `features_primary_preview.csv`, 13 of 37 columns shown
+  (delta1/2/4 rolling-change columns omitted only for table width).
+- Module 2: first 8 of 306 rows from a newly generated `module2_placement_events_preview.csv`
+  (didn't exist before - generated from `module2_placement_events_primary.parquet` via pandas,
+  same naming convention as the existing `features_*_preview.csv` files), with an `InfoNote`
+  clarifying the other 87 evaluation rounds come from a separate `..._churn.parquet` with an
+  extra `msname` column.
+
+Used the existing shadcn `Table` component (`components/ui/table.tsx`, already used on
+`/knowledge` and `/teastore`) rather than introducing a new one. Long instance/node hex IDs
+truncated for display; numeric cells formatted (integers as-is, floats to 3 or 1 decimal places
+depending on magnitude) rather than dumping raw floating-point noise.
+
+Verified: `tsc --noEmit` clean, `eslint` clean on the changed file, non-ASCII sweep clean, local
+render test on the running dev server (port 8880) confirmed both tables render with real values
+server-side (e.g. `457` from the feature table, the truncated hash `d909c5365da2fe...` from the
+placement table) via curl against the RSC payload. Deployed to the VM (the new preview CSV plus
+the two changed webapp files), `tsc --noEmit` re-run clean on the VM, curl-verified the same
+real-value markers server-side there too, and re-checked all eight routes return 200.
+
+---
+
+**Research Overview novelty cards: backed with evidence, not bare assertions (2026-08-10).**
+User flagged that Module 3's card asserted the PI+conformal combination is "already published"
+with no evidence for the claim, and asked for all three modules' novelty cards to be updated the
+same way. Added an "Evidence:" paragraph to each of the three cards in `app/page.tsx`'s novelty
+section, sourced from real, already-committed files rather than paraphrased or invented:
+
+- **Module 1** (TreeSHAP attribution): cited the SHAP sanity check's real per-signal result -
+  3 of 4 signal families (p99 latency, CPU, provider-RPC rate) correctly attributed as the
+  dominant driver by TreeSHAP under single-signal synthetic perturbation; memory was not,
+  reported honestly rather than rounded up. Source: `results/module1/primary/shap_sanity_check.json`.
+- **Module 2** (discount factor): explained why the real trace couldn't provide evidence (its
+  one non-stationary window had uniform drift, not the differential/rank-swapping drift
+  discounting targets), then cited the synthetic rank-inversion addendum's real numbers - 100%
+  win rate across 50 repeats in the recovery window (mean reward 0.36 vs. 0.18), 98% over the
+  full post-inversion phase (0.66 vs. 0.46), Wilcoxon p under 0.0001 both times. Source:
+  `results/module2/synthetic_rank_inversion.json`.
+- **Module 3** (oscillation-conditioned widening): added the actual citation for the "already
+  published" claim - Liu, Li, Farkiani & Crowley, *BACC: Budget-Aware Calibration and Control
+  for Horizontal Autoscaling* (arXiv:2606.20575, 2026), reference [2] in
+  `docs/References_MultiSignal_Autoscaling.md`, already independently verified there against
+  Crossref/Semantic Scholar earlier in the project - not a new, unverified citation invented for
+  this page. Then cited the synthetic multi-burst addendum's real numbers (mean reversal count
+  7.64 vs. 14.04 across 50 repeats, never worse in 96% of them, Wilcoxon p under 0.0001) as
+  evidence for the added mechanism itself. Source: `results/module3/synthetic_multi_burst.json`.
+
+Deliberately did not invent citations for TreeSHAP or Thompson Sampling themselves (Module 1/2's
+base techniques) - unlike BACC, neither has a matching entry in the project's own
+independently-verified reference list, and the user had previously chosen to leave informal
+citations as-is elsewhere in this session rather than have unverified bibliographic details
+added. Module 1/2's cards instead note the base technique is standard/published in passing, and
+carry their evidentiary weight entirely on the real internal validation numbers.
+
+Verified: `tsc --noEmit` clean, `eslint` clean, non-ASCII sweep clean (rewrote two initial drafts
+that used Unicode superscript-minus p-value notation - the same glyph class already known this
+session to fall outside Geist's font subset - as the house-style "p under 0.0001" phrase used
+elsewhere in this app instead). Local render test confirmed all three evidence paragraphs and
+the BACC citation present via curl against the dev server's RSC payload. Deployed to the VM,
+`tsc --noEmit` re-run clean there, curl-verified the same content server-side, and re-checked all
+eight routes return 200.
+
+---
+
+**Research Overview: "Methodology at a glance" expanded into a detailed "Evaluation process"
+section (2026-08-10).** User asked whether the site had an evaluation-process section, and to
+detail it if it did rather than add a duplicate. The existing section was genuinely just "at a
+glance" (one paragraph + a 6-step flow diagram), so replaced it in place with a three-part
+`app/page.tsx` section, all sourced from real project files rather than the prospective
+`docs/Research_Methodology_MultiSignal_Autoscaling.md` plan doc (which CLAUDE.md already flags
+as describing the original, not-fully-executed design):
+
+- **Stage 1 (offline)**: per-module validation methods (time-ordered holdout, walk-forward,
+  generalization check for Module 1; chronological real-event replay + regret baselines for
+  Module 2; step-response + conformal coverage for Module 3), plus the Phase 4 integration
+  check that caught the real anti-windup bug before the live phase began.
+- **Stage 2 (live)**: the actual 5-arm design as a real table (arm / scaling signal / threshold
+  source / scheduler / what it isolates), pulled verbatim from `docs/Phase6_Ablation_Design.md`
+  section 2 rather than reconstructed from memory. Disclosed two things honestly rather than
+  smoothing them over: the "3 workload types" figure in the original methodology plan was a
+  drafting inconsistency (verified against `docs/Progress_Trace_MultiSignal_Autoscaling.md`'s
+  Phase 6 section - only two were ever concretely named, the third was already flagged
+  unfinalized before the phase began), not a real descope of planned work; and the follow-up
+  study's own TeaStore service-registry bug (verified against
+  `docs/Results_v2_Study_Report_MultiSignal_Autoscaling.md` section 6) affects latency
+  comparability between the two studies specifically, not the other six metrics.
+- **Statistical analysis**: the actual 5-step pipeline and the exact 7 metrics logged, verified
+  directly against `results/phase7/statistical_analysis.json`'s real `metadata` block (arms,
+  n_trials_per_arm, the power caveat's exact wording) and `omnibus_tests` keys, not paraphrased
+  from the older methodology plan's more generic description (which mentions Bonferroni, not the
+  Benjamini-Hochberg correction actually used).
+
+New shadcn `Table` import added to `app/page.tsx` for the arms table (component already used
+elsewhere in the app, no new dependency).
+
+Verified: `tsc --noEmit` clean, `eslint` clean, non-ASCII sweep clean, local render test
+confirmed the new heading, the arms table, and several distinctive real phrases ("drafting
+inconsistency", "Benjamini-Hochberg", the TeaStore registry-bug disclosure) via curl against the
+dev server's RSC payload. Deployed to the VM, `tsc --noEmit` re-run clean there, same real-content
+curl checks passed server-side, and all eight routes re-confirmed at 200.
+
+---
+
+**Data Pipeline: validation Cards expanded from bare pass/fail lists into real evidence
+(2026-08-10).** User opened `module1_signal_fusion/validate.py` and pointed out that each
+module's "Validation results" Card on `/data-pipeline` only stated a one-line claim plus a
+pass/disclosed badge, with no process or evidence behind it - unlike the much more detailed
+`/results` page's per-module sections (fold tables, SHAP tables, three-way comparison tables).
+Rewrote all three Cards in `app/data-pipeline/page.tsx` in place, re-deriving every number from
+the real committed JSON files rather than reusing the page's own prior paraphrased one-liners:
+
+- **Module 1** (`results/module1/primary/metrics.json`): each of the 5 real pass_criteria keys
+  got its own numbered block - exact holdout vs. walk-forward AUC-PR/AUC-ROC numbers (and why
+  the walk-forward mean is the more reliable of the two), the real 18-episode lead-time
+  comparison (0.44 vs. 1.06 buckets, reported as a genuine negative result), the generalization
+  check's real numbers, and a new 4-row table of the TreeSHAP sanity check's real per-signal
+  result (3 pass, memory_utilization misattributed).
+- **Module 2** (`results/module2/metrics.json`): real regret numbers for all three baselines
+  (combined 4.68, random 5.73, heuristic-only 0.49 - the heuristic actually won), the real
+  43-round non-stationary-window comparison (0.317 vs. 0.330) with the uniform-vs-differential
+  drift explanation folded in (replacing a separate, now-redundant `InfoNote`), and the
+  synthetic addendum's real win-rate/effect numbers.
+- **Module 3** (`results/module3/metrics.json`): split into 6 numbered checks matching the file's
+  actual 5 pass_criteria keys plus the addendum, added a new 3-row/4-column real-numbers table
+  (fixed / PI+conformal / full x instability, deviation, over-/under-provisioning) previously
+  only described in prose, and the real synthetic multi-burst numbers including the
+  not-statistically-significant deviation-std comparison (p ~= 0.45), disclosed rather than
+  omitted.
+
+Verified every percentage/table value against the source JSON directly (e.g. Module 3's
+three-way over-/under-provisioning percentages independently recomputed in Python and matched
+to one decimal place) rather than trusting the page's own prior wording.
+
+Verified: `tsc --noEmit` clean, `eslint` clean, non-ASCII sweep clean, local render test
+confirmed the new numbered checks, the TreeSHAP and three-way-comparison tables, and the
+Module 2 regret/entropy numbers via curl against the dev server's RSC payload. Deployed to the
+VM, `tsc --noEmit` re-run clean there, same real-content curl checks passed server-side, and all
+eight routes re-confirmed at 200.
+
+---
+
+**Project Overview: new "Complete technical reference" section (2026-08-10).** User (with
+`module3_adaptive_control/common.py` open) pointed out the page only covered each module's
+process in plain language and asked for a systematic, every-detail section covering each module
+and the full system. Added a new section to `app/overview/page.tsx`, between "The three modules,
+in detail" and "How it runs live", built entirely from source rather than the page's own prior
+plain-language descriptions:
+
+- **Per-module spec tables** (Module 1/2/3 + the actuator, 4 two-column Cards): technique, real
+  inputs/outputs, real config values, individual novelty element, and code locations - both
+  offline and live - for each. Config values read directly from
+  `configs/module{1,2,3}_default.json` rather than `common.py`'s dataclass defaults, since the
+  JSON files are what `Module3Config.load()` etc. actually load at runtime (caught one real
+  discrepancy: `common.py`'s `Module3Config` dataclass default for `oscillation_k` is 0.3, but
+  the committed `module3_default.json` - what's actually used - is 4.0; used the JSON value).
+- **A full-system inventory table**: every live component (Module 1/2/3 controllers, the
+  actuator, Kubernetes itself) with its real port, real endpoints, and real poll/act cycle time -
+  read directly from each `live_cluster/*/app.py`'s own `ThreadingHTTPServer(...)` binding,
+  `self.path ==` endpoint checks, and `*_SECONDS` interval constants (module1: port 8000,
+  `/risk`/`/metrics`/`/healthz`, 8 probes per 2-min bucket; module2: port 8090,
+  `/filter`/`/prioritize`/`/state`/`/healthz` - a real scheduler-extender webhook, 15s reward
+  poll; module3: port 8091, `/state`/`/metrics`/`/healthz`, 120s poll; actuator: port 8092,
+  `/state`/`/healthz`, 30s cycle) - not reconstructed from memory or the architecture diagram's
+  simplified version.
+
+Verified: `tsc --noEmit` clean, `eslint` clean, non-ASCII sweep clean, local render test
+confirmed the new heading, all four port numbers, and the system inventory table's content via
+curl against the dev server's RSC payload. Deployed to the VM, `tsc --noEmit` re-run clean there,
+same real-content curl checks passed server-side, and all eight routes re-confirmed at 200.
+
+---
+
 ## Phase 7 — Polish & cross-cutting
 
 | Task | Status | Notes |

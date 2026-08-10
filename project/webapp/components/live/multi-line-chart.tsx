@@ -1,3 +1,8 @@
+"use client";
+
+import { useId, useRef, useState } from "react";
+import { RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
+
 const WIDTH = 600;
 const HEIGHT = 168;
 const PAD_LEFT = 40;
@@ -8,6 +13,13 @@ const PLOT_LEFT = PAD_LEFT;
 const PLOT_RIGHT = WIDTH - PAD_RIGHT;
 const PLOT_TOP = PAD_TOP;
 const PLOT_BOTTOM = HEIGHT - PAD_BOTTOM;
+
+// Time-axis zoom tuning: never let a zoomed window shrink below 15s of real
+// time (an empty or near-empty window is both useless and a div-by-zero
+// risk), and each zoom step scales the visible window by this factor so
+// repeated clicks/scrolls feel proportional rather than linear.
+const MIN_WINDOW_SECONDS = 15;
+const ZOOM_STEP = 0.6;
 
 export interface TimeSeriesPoint {
   /** Seconds elapsed since this series' own start - not a poll index. */
@@ -67,12 +79,13 @@ function usablePoints(values: TimeSeriesPoint[]): Point[] {
   return values.filter((p): p is Point => typeof p.v === "number" && Number.isFinite(p.v));
 }
 
-function toPoints(values: TimeSeriesPoint[], maxT: number, min: number, max: number): string {
+function toPoints(values: TimeSeriesPoint[], viewMin: number, viewMax: number, min: number, max: number): string {
   const usable = usablePoints(values);
   if (usable.length < 2) return "";
+  const span = viewMax - viewMin || 1;
   return usable
     .map(({ t, v }) => {
-      const x = PLOT_LEFT + (maxT > 0 ? t / maxT : 0) * (PLOT_RIGHT - PLOT_LEFT);
+      const x = PLOT_LEFT + ((t - viewMin) / span) * (PLOT_RIGHT - PLOT_LEFT);
       const norm = (v - min) / (max - min || 1);
       const y = PLOT_BOTTOM - Math.min(1, Math.max(0, norm)) * (PLOT_BOTTOM - PLOT_TOP);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
@@ -84,13 +97,18 @@ function toPoints(values: TimeSeriesPoint[], maxT: number, min: number, max: num
  * When series sit close together (e.g. two co-scheduling nodes both around
  * 0.78), plotting them against the full prop-supplied [min, max] makes them
  * visually indistinguishable - the whole point of the data collapses into
- * one apparent line. Zooms the y-domain to where the data actually lives,
- * padded, but never wider than the caller's own [hardMin, hardMax] bounds.
- * Returns the original bounds unchanged if there's no data yet, or if the
- * data already spans most of the range (nothing to gain by zooming).
+ * one apparent line. Zooms the y-domain to where the *currently visible*
+ * data actually lives (respecting a time-axis zoom, if any), padded, but
+ * never wider than the caller's own [hardMin, hardMax] bounds. Returns the
+ * original bounds unchanged if there's no visible data yet, or if the data
+ * already spans most of the range (nothing to gain by zooming).
  */
-function autoFitDomain(series: NamedSeries[], hardMin: number, hardMax: number): [number, number] {
-  const values = series.flatMap((s) => usablePoints(s.values).map((p) => p.v));
+function autoFitDomain(series: NamedSeries[], hardMin: number, hardMax: number, viewMin: number, viewMax: number): [number, number] {
+  const values = series.flatMap((s) =>
+    usablePoints(s.values)
+      .filter((p) => p.t >= viewMin && p.t <= viewMax)
+      .map((p) => p.v),
+  );
   if (values.length === 0) return [hardMin, hardMax];
   const dataMin = Math.min(...values);
   const dataMax = Math.max(...values);
@@ -113,11 +131,19 @@ interface EndLabel {
  * way to keep series distinguishable when their colors alone aren't enough
  * (lines overlapping, or a reader who can't rely on color). Nudges labels
  * apart vertically when two lines are close enough that their labels would
- * otherwise collide. */
-function computeEndLabels(series: NamedSeries[], min: number, max: number, yOf: (v: number) => number, formatValue: (v: number) => string): EndLabel[] {
+ * otherwise collide. Uses each series' last point *within the visible time
+ * window*, not necessarily its true last point overall, so the label stays
+ * meaningful (and on-screen) when the user has zoomed into an earlier span. */
+function computeEndLabels(
+  series: NamedSeries[],
+  viewMin: number,
+  viewMax: number,
+  yOf: (v: number) => number,
+  formatValue: (v: number) => string,
+): EndLabel[] {
   const raw = series
     .map((s) => {
-      const usable = usablePoints(s.values);
+      const usable = usablePoints(s.values).filter((p) => p.t >= viewMin && p.t <= viewMax);
       const last = usable.at(-1);
       if (!last) return null;
       return { key: s.label, color: s.color, y: yOf(last.v), text: formatValue(last.v) };
@@ -148,6 +174,16 @@ export interface NamedSeries {
  * threshold/replicas, or several for Module 2's per-node quality) and for
  * the TeaStore page's recorded reference trial (a single, already-finished
  * trial's own traces, no live component involved at all).
+ *
+ * The time axis is user-zoomable: the +/- buttons and mouse-wheel scroll
+ * over the plot both narrow or widen the visible time window around a
+ * center point (the wheel anchors on the cursor's position; the buttons
+ * anchor on the window's current center). Zooming never discards or
+ * re-fetches data - it only changes which already-loaded span is drawn, so
+ * it works identically on a still-growing live chart and a static finished
+ * trial. The y-axis (value range) is not user-zoomable, but when `autoFitY`
+ * is set it automatically re-fits to whatever's visible in the current time
+ * window, so zooming into a busy period also zooms the value scale to it.
  */
 export function MultiLineChart({
   label,
@@ -172,11 +208,69 @@ export function MultiLineChart({
   autoFitY?: boolean;
   formatValue?: (v: number) => string;
 }>) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const clipId = useId();
   const maxT = Math.max(1, ...series.map((s) => s.values.at(-1)?.t ?? 0));
   const hasAnyData = series.some((s) => usablePoints(s.values).length >= 2);
 
-  const [domainMin, domainMax] = autoFitY ? autoFitDomain(series, min, max) : [min, max];
-  const zoomed = autoFitY && (domainMin !== min || domainMax !== max);
+  // null = fully zoomed out (showing the whole [0, maxT] history).
+  const [zoomWindow, setZoomWindow] = useState<[number, number] | null>(null);
+  const [viewMin, viewMax] = zoomWindow ?? [0, maxT];
+  const isTimeZoomed = zoomWindow !== null;
+
+  function clampWindow(center: number, width: number): [number, number] {
+    const w = Math.min(maxT, Math.max(MIN_WINDOW_SECONDS, width));
+    let lo = center - w / 2;
+    let hi = center + w / 2;
+    if (lo < 0) { hi -= lo; lo = 0; }
+    if (hi > maxT) { lo -= hi - maxT; hi = maxT; }
+    return [Math.max(0, lo), Math.min(maxT, hi)];
+  }
+
+  function zoomIn(anchor?: number) {
+    if (maxT <= MIN_WINDOW_SECONDS) return;
+    const center = anchor ?? (viewMin + viewMax) / 2;
+    const width = (viewMax - viewMin) * ZOOM_STEP;
+    setZoomWindow(clampWindow(center, width));
+  }
+
+  function zoomOut(anchor?: number) {
+    if (!isTimeZoomed) return;
+    const center = anchor ?? (viewMin + viewMax) / 2;
+    const width = (viewMax - viewMin) / ZOOM_STEP;
+    if (width >= maxT) {
+      setZoomWindow(null);
+    } else {
+      setZoomWindow(clampWindow(center, width));
+    }
+  }
+
+  function resetZoom() {
+    setZoomWindow(null);
+  }
+
+  function handleWheel(e: React.WheelEvent<SVGSVGElement>) {
+    if (!hasAnyData || maxT <= MIN_WINDOW_SECONDS) return;
+    const svg = svgRef.current;
+    if (!svg || e.deltaY === 0) return;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return;
+    const loc = pt.matrixTransform(ctm.inverse());
+    if (loc.x < PLOT_LEFT || loc.x > PLOT_RIGHT) return; // only hijack scroll when the cursor is over the plot itself
+    e.preventDefault();
+    const anchor = viewMin + ((loc.x - PLOT_LEFT) / (PLOT_RIGHT - PLOT_LEFT)) * (viewMax - viewMin);
+    if (e.deltaY < 0) zoomIn(anchor);
+    else zoomOut(anchor);
+  }
+
+  const canZoomIn = hasAnyData && maxT > MIN_WINDOW_SECONDS && viewMax - viewMin > MIN_WINDOW_SECONDS + 1e-6;
+  const canZoomOut = isTimeZoomed;
+
+  const [domainMin, domainMax] = autoFitY ? autoFitDomain(series, min, max, viewMin, viewMax) : [min, max];
+  const yAutoFitted = autoFitY && (domainMin !== min || domainMax !== max);
 
   const yTicks = niceTicks(domainMin, domainMax, 8, integerTicks);
   const yDecimals = decimalsForStep(yTicks.length > 1 ? yTicks[1] - yTicks[0] : domainMax - domainMin);
@@ -187,28 +281,52 @@ export function MultiLineChart({
   };
 
   const xTickCount = 5;
-  const xTicks = Array.from({ length: xTickCount + 1 }, (_, i) => (maxT * i) / xTickCount);
-  const xOf = (t: number) => PLOT_LEFT + (maxT > 0 ? t / maxT : 0) * (PLOT_RIGHT - PLOT_LEFT);
+  const xTicks = Array.from({ length: xTickCount + 1 }, (_, i) => viewMin + ((viewMax - viewMin) * i) / xTickCount);
+  const xOf = (t: number) => PLOT_LEFT + ((viewMax - viewMin) > 0 ? (t - viewMin) / (viewMax - viewMin) : 0) * (PLOT_RIGHT - PLOT_LEFT);
 
   const showEndLabels = hasAnyData && series.length >= 2 && series.length <= 4;
-  const endLabels = showEndLabels ? computeEndLabels(series, domainMin, domainMax, yOf, fmt) : [];
+  const endLabels = showEndLabels ? computeEndLabels(series, viewMin, viewMax, yOf, fmt) : [];
+
+  const zoomBtnClass =
+    "rounded border p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30";
 
   return (
     <figure className="space-y-2 rounded-lg border bg-card p-4">
-      <figcaption className="flex items-center justify-between text-xs text-muted-foreground">
+      <figcaption className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">{label}</span>
-        <span>
-          {zoomed
-            ? `${fmt(domainMin)} – ${fmt(domainMax)} (zoomed in from ${min}${unit ?? ""}–${max}${unit ?? ""})`
-            : `${min}${unit ?? ""} – ${max}${unit ?? ""}`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span>
+            {yAutoFitted
+              ? `${fmt(domainMin)} – ${fmt(domainMax)} (zoomed in from ${min}${unit ?? ""}–${max}${unit ?? ""})`
+              : `${min}${unit ?? ""} – ${max}${unit ?? ""}`}
+          </span>
+          <div className="flex items-center gap-0.5" role="group" aria-label="Zoom time axis">
+            <button type="button" title="Zoom out" aria-label="Zoom out" className={zoomBtnClass} disabled={!canZoomOut} onClick={() => zoomOut()}>
+              <ZoomOut className="size-3" />
+            </button>
+            <button type="button" title="Reset zoom (show full history)" aria-label="Reset zoom" className={zoomBtnClass} disabled={!isTimeZoomed} onClick={resetZoom}>
+              <RotateCcw className="size-3" />
+            </button>
+            <button type="button" title="Zoom in" aria-label="Zoom in" className={zoomBtnClass} disabled={!canZoomIn} onClick={() => zoomIn()}>
+              <ZoomIn className="size-3" />
+            </button>
+          </div>
+        </div>
       </figcaption>
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="img"
-        aria-label={`${label}: ${series.map((s) => s.label).join(", ")}, scaled ${fmt(domainMin)} to ${fmt(domainMax)}${zoomed ? " (zoomed)" : ""}, over ${formatElapsed(maxT)} elapsed`}
-        className="h-auto w-full text-foreground"
+        onWheel={handleWheel}
+        aria-label={`${label}: ${series.map((s) => s.label).join(", ")}, scaled ${fmt(domainMin)} to ${fmt(domainMax)}${yAutoFitted ? " (zoomed)" : ""}, showing ${formatElapsed(viewMin)} to ${formatElapsed(viewMax)} of ${formatElapsed(maxT)} elapsed`}
+        className="h-auto w-full touch-pan-y text-foreground"
       >
+        <defs>
+          <clipPath id={clipId}>
+            <rect x={PLOT_LEFT} y={PLOT_TOP} width={PLOT_RIGHT - PLOT_LEFT} height={PLOT_BOTTOM - PLOT_TOP} />
+          </clipPath>
+        </defs>
+
         {/* sub-axis gridlines: dashed, recessive - the data lines carry the eye, not the grid */}
         {yTicks.map((tick) => (
           <line
@@ -257,10 +375,12 @@ export function MultiLineChart({
           );
         })}
 
-        {series.map((s) => {
-          const points = toPoints(s.values, maxT, domainMin, domainMax);
-          return points ? <polyline key={s.label} points={points} fill="none" stroke={s.color} strokeWidth={2} /> : null;
-        })}
+        <g clipPath={`url(#${clipId})`}>
+          {series.map((s) => {
+            const points = toPoints(s.values, viewMin, viewMax, domainMin, domainMax);
+            return points ? <polyline key={s.label} points={points} fill="none" stroke={s.color} strokeWidth={2} /> : null;
+          })}
+        </g>
 
         {endLabels.map((l) => (
           <text key={`end-${l.key}`} x={PLOT_RIGHT + 4} y={l.y + 3} textAnchor="start" fontSize={9} fontWeight={600} fill={l.color}>
@@ -281,6 +401,11 @@ export function MultiLineChart({
         ) : (
           <span>{emptyReason ?? "Waiting for live readings."}</span>
         )}
+        {isTimeZoomed ? (
+          <span>
+            Showing {formatElapsed(viewMin)}–{formatElapsed(viewMax)} of {formatElapsed(maxT)}
+          </span>
+        ) : null}
       </div>
     </figure>
   );

@@ -11,6 +11,7 @@ export const IMPLEMENTATION_DIR = path.resolve(PROJECT_DIR, "..");
 export const RESULTS_DIR = path.join(PROJECT_DIR, "results");
 export const RESULTS_V2_DIR = path.join(PROJECT_DIR, "results_v2");
 export const LIVE_CLUSTER_DIR = path.join(PROJECT_DIR, "live_cluster");
+export const DATA_PROCESSED_DIR = path.join(PROJECT_DIR, "data", "processed");
 
 export const TARGET_DEPLOYMENT = "teastore-webui";
 
