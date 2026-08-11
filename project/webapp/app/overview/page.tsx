@@ -3,7 +3,58 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ArchitectureDiagram } from "@/components/architecture-diagram";
 import { StepFlow } from "@/components/step-flow";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { GraduationCap } from "lucide-react";
+
+type SpecRow = { label: string; value: string };
+
+const MODULE1_SPEC: SpecRow[] = [
+  { label: "Technique", value: "LightGBM gradient-boosted classifier, 150 trees (learning_rate=0.05, num_leaves=7, max_depth=4, min_child_samples=5, class_weight=balanced)" },
+  { label: "Inputs", value: "A 37-column feature table: 10 raw signal columns (p95/p99 latency, call count, HTTP + provider-RPC call rate/response time, CPU, memory, active instances) plus 24 rolling 1/2/4-bucket delta columns, per 2-minute bucket" },
+  { label: "Output", value: "predicted_risk - a probability (0-1) that the next 2-minute bucket breaches the service's own observed p99 threshold - plus a per-prediction TreeSHAP attribution across the 4 perturbation-tested signal families" },
+  { label: "Key parameters", value: "decision_threshold=0.5, walk_forward_n_splits=5, lead_time_target_alert_rate=0.15 (configs/module1_default.json)" },
+  { label: "Individual novelty", value: "TreeSHAP attribution exposed as a real, consumed output for every prediction - not just an internal diagnostic used while building the model" },
+  { label: "Code - offline", value: "module1_signal_fusion/{train.py, validate.py, export_full_trace.py, export_walkforward_oos.py}" },
+  { label: "Code - live", value: "live_cluster/module1_controller/app.py" },
+  { label: "Live API", value: "Port 8000 - GET /risk, GET /metrics, GET /healthz. Probes the live app 8 times per 2-minute bucket (every 15s), publishing a fresh predicted_risk roughly every 2 minutes." },
+];
+
+const MODULE2_SPEC: SpecRow[] = [
+  { label: "Technique", value: "Beta-Bernoulli Thompson Sampling bandit with a discounted posterior update (gamma < 1)" },
+  { label: "Inputs", value: "Up to 6 candidate nodes per decision, each with live CPU/memory headroom; reward is the chosen node's observed CPU/memory headroom over the following 5-minute window" },
+  { label: "Output", value: "Live: a priority score per candidate node returned to Kubernetes' own scheduler, which picks the highest. Offline: the simulated chosen node id, for regret measurement." },
+  { label: "Key parameters", value: "discount_gamma=0.9, n_candidates=6, reward_window_minutes=5, node_max_cpu/mem_for_candidate=0.9, warmup_rounds=5 (heuristic fallback while cold) (configs/module2_default.json)" },
+  { label: "Individual novelty", value: "The discount factor itself - gamma=0.9 decays accumulated belief toward the uninformative prior before each update, vs. vanilla Thompson Sampling's gamma=1.0 (never forgets)" },
+  { label: "Code - offline", value: "module2_co_scheduling/{bandit.py, simulate.py, validate.py}" },
+  { label: "Code - live", value: "live_cluster/module2_extender/app.py - a real Kubernetes scheduler-extender webhook, not a standalone service Kubernetes has to be told to trust in any special way" },
+  { label: "Live API", value: "Port 8090 - POST /filter, POST /prioritize (the two calls Kubernetes' own scheduler makes to a real extender), GET /state, GET /healthz. Rewards polled and the posterior updated every 15s." },
+];
+
+const MODULE3_SPEC: SpecRow[] = [
+  { label: "Technique", value: "PI controller (kp=0.6, ki=0.15, setpoint=0.10) wrapped in Adaptive Conformal Inference (alpha_target=0.10, gamma=0.05, score_window=20), plus a reversal-count-conditioned widening multiplier" },
+  { label: "Inputs", value: "Module 1's predicted_risk and the matching actual_outcome - offline, its own held-out residual stream; live, Module 1's /risk output plus the observed outcome" },
+  { label: "Output", value: "An adaptive alert threshold, bounded to [0.01, 0.9] (threshold_bounds)" },
+  { label: "Key parameters", value: "base_max_step=0.05, width_sensitivity=3.0, alpha_bounds=[0.02, 0.5], oscillation_window=8, oscillation_k=4.0 (configs/module3_default.json)" },
+  { label: "Individual novelty", value: "rolling_reversal_count() over the threshold's own recent trajectory multiplies the conformal interval width before it bounds the controller's next move - the reversal guard" },
+  { label: "Code - offline", value: "module3_adaptive_control/{pi_controller.py, conformal.py, common.py, validate.py}" },
+  { label: "Code - live", value: "live_cluster/module3_controller/app.py" },
+  { label: "Live API", value: "Port 8091 - GET /state, GET /metrics, GET /healthz. Polls Module 1's /risk every 120s and recomputes the threshold on each poll." },
+];
+
+const ACTUATOR_SPEC: SpecRow[] = [
+  { label: "Role", value: "The 4th live component - not one of the 3 modules, but the only one that actually changes anything. Reads Module 1's predicted_risk and Module 3's current threshold, applies a symmetric band rule (signal > threshold: +1 replica; signal < threshold x 0.5: -1 replica; else hold), and calls the Kubernetes API's scale subresource directly." },
+  { label: "Bounds", value: "Replica count bounded to [1, 3] (the same minReplicas/maxReplicas range every ablation arm shares, including the standard-autoscaler baseline)" },
+  { label: "Code", value: "live_cluster/actuator/app.py" },
+  { label: "Live API", value: "Port 8092 - GET /state, GET /healthz. Acts every 30s." },
+];
+
+const SYSTEM_INVENTORY = [
+  { component: "Module 1 controller", port: "8000", endpoints: "/risk, /metrics, /healthz", cycle: "~15s probe / ~2min output", reads: "Live app response times, resource metrics", writesActs: "Nothing - read-only observer" },
+  { component: "Module 2 extender", port: "8090", endpoints: "/filter, /prioritize, /state, /healthz", cycle: "15s reward poll", reads: "Candidate node CPU/memory, placement outcomes", writesActs: "A priority score returned to Kubernetes' own scheduler" },
+  { component: "Module 3 controller", port: "8091", endpoints: "/state, /metrics, /healthz", cycle: "120s", reads: "Module 1's /risk", writesActs: "Its own adaptive threshold (read by the actuator)" },
+  { component: "Actuator", port: "8092", endpoints: "/state, /healthz", cycle: "30s", reads: "Module 1's /risk, Module 3's /state", writesActs: "Kubernetes' scale subresource (replica count)" },
+  { component: "Kubernetes (unmodified)", port: "-", endpoints: "standard Kubernetes API", cycle: "continuous", reads: "The actuator's scale calls, the extender's filter/prioritize scores", writesActs: "Actually creates, removes, and binds replicas" },
+];
 
 const ABLATION_ARMS = [
   {
@@ -63,6 +114,21 @@ const TEAM = [
       "On the real bursty segment, the reversal guard — this module's own novelty contribution — produced no visible reduction in reversal count, because that segment contains only four reversals in total: too few for any difference to show. Addressed with a repeated synthetic test (fifty runs of fifteen bursts each), where the mean reversal count fell from 14.04 to 7.64.",
   },
 ];
+
+function SpecTable({ rows }: { rows: SpecRow[] }) {
+  return (
+    <Table>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.label}>
+            <TableCell className="w-40 align-top font-medium text-foreground">{row.label}</TableCell>
+            <TableCell className="whitespace-normal align-top text-muted-foreground">{row.value}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
 
 export default function ProjectOverviewPage() {
   return (
@@ -188,6 +254,97 @@ export default function ProjectOverviewPage() {
               />
             </CardContent>
           </Card>
+        </div>
+      </section>
+
+      <Separator />
+
+      <section className="space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight">Complete technical reference</h2>
+          <p className="max-w-3xl text-muted-foreground">
+            The section above explains each module&apos;s process in plain language. This section
+            is the systematic version: every module&apos;s exact technique, inputs, outputs, real
+            configuration values, individual novelty element, and code locations - offline and
+            live - followed by the full system as one inventory: every live component, its port,
+            its endpoints, how often it acts, and what it reads and writes.
+          </p>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Module 1 — Signal Fusion</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <SpecTable rows={MODULE1_SPEC} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Module 2 — Co-Scheduling</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <SpecTable rows={MODULE2_SPEC} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Module 3 — Adaptive Control</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <SpecTable rows={MODULE3_SPEC} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">The actuator</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <SpecTable rows={ACTUATOR_SPEC} />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold tracking-tight">The full system, as one inventory</h3>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Every live component in one table - the systematic answer to &ldquo;what actually
+            runs, where, and how often.&rdquo; Kubernetes itself is included as the last row since
+            it&apos;s the component that actually acts on every decision above it.
+          </p>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Component</TableHead>
+                  <TableHead>Port</TableHead>
+                  <TableHead>Endpoints</TableHead>
+                  <TableHead>Cycle</TableHead>
+                  <TableHead>Reads</TableHead>
+                  <TableHead>Writes / acts on</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {SYSTEM_INVENTORY.map((row) => (
+                  <TableRow key={row.component}>
+                    <TableCell className="font-medium text-foreground">{row.component}</TableCell>
+                    <TableCell className="font-mono text-xs">{row.port}</TableCell>
+                    <TableCell className="font-mono text-xs">{row.endpoints}</TableCell>
+                    <TableCell>{row.cycle}</TableCell>
+                    <TableCell>{row.reads}</TableCell>
+                    <TableCell>{row.writesActs}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Every arrow in this table runs one direction - nothing is fed back upstream. See{" "}
+            <strong>Knowledge</strong> for what state each component holds in memory between
+            cycles, and <strong>Data Pipeline</strong> for the offline training and validation
+            code behind each module&apos;s live counterpart above.
+          </p>
         </div>
       </section>
 

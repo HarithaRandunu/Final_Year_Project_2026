@@ -2,6 +2,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { StepFlow } from "@/components/step-flow";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Sparkles } from "lucide-react";
 
 function NoveltyBadge() {
@@ -165,12 +173,24 @@ export default function ResearchOverviewPage() {
               </CardTitle>
               <NoveltyBadge />
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              The risk model doesn&apos;t just output &ldquo;risk is elevated&rdquo; — using a
-              technique called TreeSHAP, it also reports <em>which</em> measurement (backlog,
-              processor usage, or latency) is driving that score for every single prediction,
-              as a real output the placement module and a human operator can both act on —
-              not just an internal diagnostic used during model-building.
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                The risk model doesn&apos;t just output &ldquo;risk is elevated&rdquo; — using a
+                technique called TreeSHAP (a standard, published attribution method for
+                tree-based models; not itself claimed as this project&apos;s novelty), it also
+                reports <em>which</em> measurement (backlog, processor usage, or latency) is
+                driving that score for every single prediction, as a real output the placement
+                module and a human operator can both act on — not just an internal diagnostic
+                used during model-building.
+              </p>
+              <p className="border-t pt-3 text-xs">
+                <strong className="text-foreground">Evidence: </strong>
+                a sanity check perturbs one signal family at a time in a synthetic input and
+                checks whether TreeSHAP correctly names it as the dominant driver. 3 of 4 signal
+                families (p99 latency, CPU, provider-RPC call rate) were correctly attributed;
+                one (memory) was not — reported as a partial result, not rounded up. Source:{" "}
+                <code className="rounded bg-muted px-1 py-0.5">results/module1/primary/shap_sanity_check.json</code>.
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -180,13 +200,26 @@ export default function ResearchOverviewPage() {
               </CardTitle>
               <NoveltyBadge />
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Placement uses Thompson Sampling, a well-understood way to learn which option
-              (here, which machine) tends to work out best. Standard Thompson Sampling assumes
-              each option&apos;s quality never changes — but cluster nodes get busier and
-              quieter over time. This project adds a <em>discount factor</em> that makes recent
-              evidence count for more than old evidence, so the policy keeps up as conditions
-              drift, instead of using the technique exactly as published.
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                Placement uses Thompson Sampling, a long-established published way to learn
+                which option (here, which machine) tends to work out best. Standard Thompson
+                Sampling assumes each option&apos;s quality never changes — but cluster nodes
+                get busier and quieter over time. This project adds a <em>discount factor</em>{" "}
+                that makes recent evidence count for more than old evidence, so the policy keeps
+                up as conditions drift, instead of using the technique exactly as published.
+              </p>
+              <p className="border-t pt-3 text-xs">
+                <strong className="text-foreground">Evidence: </strong>
+                the real trace&apos;s one non-stationary window turned out to have every node&apos;s
+                quality drift <em>together</em>, not swap rank — a condition discounting isn&apos;t
+                built to help with, and it didn&apos;t. So a synthetic test was built that
+                specifically reverses which of six nodes is best partway through and reruns it
+                50 times: the discounted policy won 100% of repeats in the recovery window
+                (mean reward 0.36 vs. 0.18, one-sided Wilcoxon p under 0.0001) and 98% of repeats
+                over the full post-inversion phase (0.66 vs. 0.46). Source:{" "}
+                <code className="rounded bg-muted px-1 py-0.5">results/module2/synthetic_rank_inversion.json</code>.
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -196,14 +229,28 @@ export default function ResearchOverviewPage() {
               </CardTitle>
               <NoveltyBadge />
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              The control loop that adjusts the alert threshold already uses a published
-              combination of a PI (proportional-integral) controller and conformal prediction
-              (a way of calibrating how much to trust the model right now). This project adds
-              one more input: it counts how often the controller has recently reversed
-              direction, and widens its own safety margin in proportion — so the permitted
-              step shrinks precisely when the loop has been oscillating, not only when the
-              model&apos;s predictions have been inaccurate.
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                The control loop that adjusts the alert threshold already uses a published
+                combination of a PI (proportional-integral) controller and conformal prediction
+                (a way of calibrating how much to trust the model right now) — from Liu, Li,
+                Farkiani &amp; Crowley, <em>BACC: Budget-Aware Calibration and Control for
+                Horizontal Autoscaling</em> (arXiv:2606.20575, 2026). This project adds one more
+                input on top of BACC&apos;s own mechanism: it counts how often the controller
+                has recently reversed direction, and widens its own safety margin in
+                proportion — so the permitted step shrinks precisely when the loop has been
+                oscillating, not only when the model&apos;s predictions have been inaccurate.
+              </p>
+              <p className="border-t pt-3 text-xs">
+                <strong className="text-foreground">Evidence: </strong>
+                on the real trace&apos;s one genuinely bursty segment, the full design tied its
+                PI+conformal-only baseline at 4 reversals each — too few events in that one
+                segment to separate them. So a synthetic test repeats 15 induced bursts, 50
+                times: the full design&apos;s mean reversal count was 7.64 vs. 14.04 for
+                PI+conformal alone, strictly lower in 46% of repeats and never worse in 96% of
+                them (one-sided Wilcoxon p under 0.0001). Source:{" "}
+                <code className="rounded bg-muted px-1 py-0.5">results/module3/synthetic_multi_burst.json</code>.
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -235,21 +282,19 @@ export default function ResearchOverviewPage() {
 
       <Separator />
 
-      <section className="space-y-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Methodology at a glance</h2>
-        <p className="max-w-3xl text-muted-foreground">
-          Each module was first validated offline against a twelve-hour production trace from
-          Alibaba&apos;s cluster dataset, then ported onto a real two-node Kubernetes cluster
-          running the TeaStore benchmark application for a live 25-trial ablation study — five
-          repeats each of the standard autoscaler, each module running alone, and the full
-          combined framework. Results were compared using{" "}
-          <strong>Kruskal-Wallis</strong> and <strong>Mann-Whitney</strong> tests — a way of
-          checking whether groups of results genuinely differ that doesn&apos;t assume the
-          data forms a bell-curve shape, which matters with only five trials per group — with
-          a correction applied for running many comparisons at once. See{" "}
-          <strong>Training &amp; Test Results</strong> for the full numbers and{" "}
-          <strong>Live Run</strong> for a live demonstration.
-        </p>
+      <section className="space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight">Evaluation process</h2>
+          <p className="max-w-3xl text-muted-foreground">
+            Follows Design Science Research&apos;s standard shape for &ldquo;build it, then
+            evaluate it&rdquo; systems work: <strong>build</strong> each module,{" "}
+            <strong>demonstrate</strong> it on a real running system, then{" "}
+            <strong>evaluate</strong> it against a measured baseline. Concretely, that meant two
+            separate evaluation stages, run in order — nothing was declared to work on a live
+            cluster until it had already passed offline.
+          </p>
+        </div>
+
         <StepFlow
           steps={[
             { title: "Three weaknesses", description: "identified in standard Kubernetes autoscaling" },
@@ -260,6 +305,179 @@ export default function ResearchOverviewPage() {
             { title: "Analyse", description: "Kruskal-Wallis + Mann-Whitney, vs. the standard autoscaler" },
           ]}
         />
+
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold tracking-tight">Stage 1 — offline, against a real production trace</h3>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Each module was validated on its own, before any of the three were connected to each
+            other or to a cluster, using the 12-hour Alibaba <code className="rounded bg-muted px-1 py-0.5 text-xs">cluster-trace-microservices-v2021</code>{" "}
+            trace. Where the real trace couldn&apos;t isolate the exact condition a novelty
+            element targets — see the <strong>Evidence</strong> notes above — a matching
+            synthetic test was built specifically to isolate it, always reported alongside the
+            real-data result rather than in its place.
+          </p>
+          <ul className="max-w-3xl list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+            <li>
+              <strong className="text-foreground">Module 1:</strong> a strictly time-ordered
+              75/25 holdout split (never shuffled — this is a forecasting problem), a
+              walk-forward re-validation across the timeline, and a generalization check against
+              a second, differently-patterned service.
+            </li>
+            <li>
+              <strong className="text-foreground">Module 2:</strong> real historical placement
+              events replayed in chronological order (not a synthetic simulation of the base
+              mechanism), with cumulative regret measured against a random policy and a
+              CPU x memory-headroom heuristic baseline.
+            </li>
+            <li>
+              <strong className="text-foreground">Module 3:</strong> a synthetic step-response
+              test for bounded, non-diverging behavior, plus a conformal coverage check against
+              its 90% target (88.9% observed).
+            </li>
+            <li>
+              <strong className="text-foreground">Integration check:</strong> before any of this
+              touched a cluster, the three modules&apos; independently-exported logs were
+              cross-checked for internal consistency over the full 12-hour trace. This step
+              genuinely caught a real bug — Module 3&apos;s controller stuck at its lower bound
+              for roughly 230 of 360 buckets — fixed and re-verified before Stage 2 began.
+            </li>
+          </ul>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Full code-level detail, real numbers, and pass/partial/disclosed status for every
+            criterion: see <strong>Training &amp; Test Results</strong> and{" "}
+            <strong>Data Pipeline</strong>.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold tracking-tight">Stage 2 — live, on a real Kubernetes cluster</h3>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            A controlled ablation experiment: five arms, each isolating one module&apos;s
+            contribution by changing exactly one of three switches — what signal drives scaling,
+            what sets the threshold, and which scheduler is active — while holding the other two
+            at their baseline setting.
+          </p>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Arm</TableHead>
+                  <TableHead>Scaling driven by</TableHead>
+                  <TableHead>Threshold source</TableHead>
+                  <TableHead>Scheduler</TableHead>
+                  <TableHead>What it isolates</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="font-medium">Baseline (HPA)</TableCell>
+                  <TableCell>raw CPU utilization</TableCell>
+                  <TableCell>fixed 50%</TableCell>
+                  <TableCell>default</TableCell>
+                  <TableCell>the reference point every other arm is compared against</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">M1 only (Signal Fusion)</TableCell>
+                  <TableCell>Module 1&apos;s predicted_risk</TableCell>
+                  <TableCell>fixed 0.08 (static)</TableCell>
+                  <TableCell>default</TableCell>
+                  <TableCell>whether the fused signal beats raw CPU as the trigger, alone</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">M2 only (Co-Scheduling)</TableCell>
+                  <TableCell>raw CPU utilization</TableCell>
+                  <TableCell>fixed 50%</TableCell>
+                  <TableCell>M2 extender</TableCell>
+                  <TableCell>Module 2&apos;s placement effect, with scaling held constant</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">M3 only (Adaptive Control)</TableCell>
+                  <TableCell>raw CPU error</TableCell>
+                  <TableCell>adaptive (M3, ablated to not depend on M1)</TableCell>
+                  <TableCell>default</TableCell>
+                  <TableCell>adaptive control vs. a fixed threshold, on the same raw signal as baseline</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Full (M1+M2+M3)</TableCell>
+                  <TableCell>Module 1&apos;s predicted_risk</TableCell>
+                  <TableCell>adaptive (M3, unablated)</TableCell>
+                  <TableCell>M2 extender</TableCell>
+                  <TableCell>whether combining all three beats each one alone</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Five trials per arm — <strong>25 trials</strong> — against the TeaStore benchmark
+            application under one real workload (an Alibaba-trace-derived request replay). The
+            original plan called for three workload types; this was descoped to one on
+            2026-07-29 before the study ran, disclosed honestly rather than silently: the
+            &ldquo;three&rdquo; figure in the original plan was a drafting inconsistency (only
+            two were ever concretely named, and the third — an Azure LLM inference trace — was
+            already flagged as not finalized before this phase began).
+          </p>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            This full design was run <strong>twice, independently</strong>: an original study
+            (replica ceiling 2, a shared workstation) and a follow-up study (replica ceiling 3,
+            on a dedicated cloud VM, run to test whether the original ceiling was itself
+            suppressing genuine scaling behavior). Disclosed honestly rather than smoothed over:
+            the follow-up study surfaced a genuine bug in TeaStore&apos;s own service-registry
+            client that worsens with replica churn, which affects the two studies&apos; latency
+            figures&apos; comparability specifically — not the other six metrics. See{" "}
+            <strong>Training &amp; Test Results</strong> for both studies side by side, with this
+            limitation stated wherever it applies.
+          </p>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Every 30 seconds during every trial, seven metrics are logged: SLA-violation count,
+            p99 latency, a cost proxy (polled replica count, summed across the trial), an
+            instability count (threshold direction reversals), deviation from an ideal supply
+            trajectory, and over-/under-provisioning timeshare.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold tracking-tight">How the 25 trials are analysed</h3>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            The same fixed pipeline runs on every metric, decided before the trials were run
+            rather than chosen after seeing results:
+          </p>
+          <ol className="max-w-3xl list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+            <li>Descriptive statistics first — mean and median per arm.</li>
+            <li>
+              A <strong>Kruskal-Wallis</strong> omnibus test per metric — checks whether the five
+              arms genuinely differ at all, without assuming the data forms a bell-curve shape
+              (which matters with only five trials per arm).
+            </li>
+            <li>
+              Where relevant, <strong>two-sided Mann-Whitney U</strong> tests across all ten
+              possible arm pairs, each with a <strong>rank-biserial effect size</strong> (not
+              just a p-value, so a real-but-small difference isn&apos;t reported the same way as
+              a large one).
+            </li>
+            <li>
+              A <strong>Benjamini-Hochberg</strong> correction applied across those ten
+              comparisons per metric, since testing ten pairs at once inflates the chance of a
+              false positive if left uncorrected.
+            </li>
+            <li>
+              An <strong>ablation decomposition</strong> — each module&apos;s marginal
+              contribution, computed by comparing the full framework against each
+              &ldquo;module removed&rdquo; arm.
+            </li>
+          </ol>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            A statistical-power limit is disclosed up front rather than glossed over: with five
+            trials per arm, the smallest two-sided p-value a single pairwise comparison can ever
+            reach is about 0.008, so after correction only large, consistent effects can reach
+            significance. Where a result isn&apos;t statistically significant, it&apos;s reported
+            as exactly that — not as evidence the effect doesn&apos;t exist.
+          </p>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            See <strong>Training &amp; Test Results</strong> for the full numbers from both
+            studies and <strong>Live Run</strong> for a live demonstration against a recorded
+            reference trial.
+          </p>
+        </div>
       </section>
     </div>
   );
