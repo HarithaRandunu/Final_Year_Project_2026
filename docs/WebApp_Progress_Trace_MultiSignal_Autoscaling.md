@@ -1486,6 +1486,146 @@ same real-content curl checks passed server-side, and all eight routes re-confir
 
 ---
 
+**Ablation Study Results: added the mean+/-std table and distribution box-plot image the user
+pasted a reference screenshot of (2026-08-10).** User shared a screenshot (report table + box
+plots) and asked for the same two things in both ablation studies: a per-metric,
+mean+/-standard-deviation-by-arm table, and the real `metric_distributions_by_arm.png` box-plot
+image. Neither existed on `/results` before - the panel had per-metric bar charts (means only)
+and a raw per-trial table, but nothing in between.
+
+Added both to `components/results/ablation-study-panel.tsx`, shared by both the v1 and v2 tabs
+via the existing `study` prop (no per-study special-casing needed):
+
+- `computeArmStats()` - new helper computing mean and **sample** standard deviation (n-1
+  denominator, matching pandas' default `.std()`, which is what
+  `phase7_analysis/statistical_analysis.py` itself uses) per arm per metric, directly from the
+  already-loaded `trial_level_data.csv` rows, since `statistical_analysis.json`'s
+  `omnibus_tests` only carries the mean, not the std. **Verified against the pasted screenshot
+  before shipping**: independently recomputed v1's stats in Python
+  (`df.groupby("arm")[cols].agg(["mean","std"])`) and confirmed an exact match to the pasted
+  image's numbers (e.g. baseline SLA violations 0.80 +/- 1.79, full 0.20 +/- 0.45) - confirming
+  both the pasted image and this new table are the v1 (original, replica-ceiling-2) study, and
+  that the new table's numbers are correct before ever rendering it.
+- A new `ResultFigure` display of `phase7/metric_distributions_by_arm.png` via the existing
+  `resultImageUrl(path, study)` helper - already study-aware and already covered by the image
+  route's allowlist (`app/api/results/image/[...segments]/route.ts` allows any `.png` under the
+  two results roots, not just specific module subfolders, so `phase7/...` needed no route
+  change).
+
+Used plain ASCII `+/-` throughout rather than the `±` glyph, consistent with this session's
+established rule against characters outside Geist's loaded glyph subset.
+
+Verified: `tsc --noEmit` clean, `eslint` clean, non-ASCII sweep clean. Local curl test against
+the dev server's RSC payload confirmed real numbers matching the pasted screenshot exactly
+(`"0.80"," +/- ","1.79"`, `"609"," +/- ","490"`, etc.) - notably this **contradicts** an
+assumption from earlier in this session that inactive nested Base UI tab panels don't appear in
+the SSR payload; they do (hidden via CSS, not omitted from the response), so curl-based
+verification of nested-tab content is reliable after all. Deployed to the VM, `tsc --noEmit`
+re-run clean there, same real-number curl checks passed server-side, both study's PNG routes
+independently confirmed 200/image/png with byte sizes matching the local files exactly (75967
+and 76516 bytes), and all eight routes re-confirmed at 200.
+
+---
+
+**Research Overview: Module 3's novelty card rewritten to explain the mechanism, not just
+assert a difference (2026-08-10).** User asked what BACC's published PI+conformal solution
+actually does mechanically and how it differs from this project's addition - the existing card
+(from the earlier "add evidence" pass) named the citation but didn't explain either mechanism in
+enough depth to answer that. Rewrote the card's opening paragraphs in `app/page.tsx` into two
+explicit parts, grounded in `module3_adaptive_control/conformal.py`'s own docstring (which
+already states this exact distinction precisely) and `common.py`'s `adjust_params()` (which
+shows `widened_width` feeding into `max_step` before `pi.step()`):
+
+- **"What the published solution actually does"**: the PI controller moves the threshold from
+  the risk-vs-target gap; Adaptive Conformal Inference (ACI) separately tracks whether recent
+  forecasts fell inside its own prediction interval and widens/narrows that interval based on
+  coverage failures; the interval width caps the controller's per-cycle step size. Stated
+  plainly: BACC's only source of caution is forecast accuracy.
+- **"What this project adds"**: a second, independent input - `rolling_reversal_count()` over
+  the threshold's *own* trajectory - multiplies the conformal width before it becomes a step
+  cap, so movement shrinks when the loop itself is oscillating, even across cycles where every
+  individual prediction was accurate. Named the specific failure mode this closes: risk
+  hovering right at the threshold, tipping back and forth, which plain ACI can't see since it
+  only ever compares a prediction to its outcome, never the control loop's own output history.
+
+Verified: `tsc --noEmit` clean, `eslint` clean, non-ASCII sweep clean, local render test
+confirmed both new headings and the real citation via curl against the dev server's RSC payload.
+Deployed to the VM, `tsc --noEmit` re-run clean there, same content confirmed server-side, and
+all eight routes re-confirmed at 200.
+
+---
+
+**Training & Test Results page: the top "Validation checks" badge rows now carry their own
+evidence, not just pass/disclosed pills (2026-08-10).** User pasted a screenshot of Module 1's
+card on `/results` showing five `StatusBadge` pills in a bare `flex flex-wrap` row - the exact
+same "just says pass or not" complaint as the earlier `/data-pipeline` fix, but this time about
+`/results`'s `Module{1,2,3}Section` components specifically, and for all three modules ("not just
+module 1"). Unlike `/data-pipeline`, these components already had real evidence further down the
+same card (fold tables, three-way comparison tables) - but the top badge row itself, the first
+thing visible, was disconnected from it: a badge and a label, nothing else, until the user
+scrolled.
+
+Converted each module's top badge row from a bare `flex flex-wrap` of `<StatusBadge>` into a
+vertical list where every check gets its own one-line real-number caption directly beside its
+badge, sourced from the same already-loaded metrics object each component already had in scope
+(no new data loading):
+
+- `module1-section.tsx` (5 checks): holdout AUC-ROC 0.65 vs. 0.43, walk-forward mean AUC-PR 0.29
+  vs. 0.27, lead time 0.44 vs. 1.06 buckets across 18 episodes, SHAP 3/4 and 4/4 pass counts.
+- `module2-section.tsx` (2 checks): regret numbers for all three baselines, and the 43-round
+  real shift-window reward comparison (0.317 vs. 0.330).
+- `module3-section.tsx` (5 checks): isolated PI final value, conformal coverage 88.9% vs. 90%,
+  step response settling time/overshoot, the reversal-spike sensitivity correlation (0.97) with
+  before/after widened-width numbers, and the real-trace three-way tie (4 vs. 4 reversals).
+
+The detailed sections further down each card (fold tables, SHAP per-signal table, three-way
+comparison table, synthetic addenda) were left as-is - this change makes the top-level summary
+self-contained, it doesn't replace the deeper methodology sections, which remain the place to
+go for the full breakdown.
+
+Verified: `tsc --noEmit` clean, `eslint` clean, non-ASCII sweep clean across all three files.
+Local render test confirmed real numbers rendering server-side for all three modules via curl
+against the dev server's RSC payload (e.g. "the combined system beats random but not the
+heuristic", "0.44" for Module 1's lead time, "right after it" for Module 3's sensitivity check).
+Deployed to the VM, `tsc --noEmit` re-run clean there, same real-content curl checks passed
+server-side, and all eight routes re-confirmed at 200.
+
+---
+
+**Research Overview: Module 3's novelty card rewritten again, this time both corrected (against
+the real BACC paper) and reshaped into short bullet points (2026-08-10).** This session's prior
+pass at this card (a few turns earlier) described BACC as "a PI controller moves the threshold
+based on risk-vs-target, ACI caps the step size" - reasonable-sounding, but not actually what the
+paper says. In between, the user asked to fetch and read the actual paper (arXiv:2606.20575) to
+verify, which surfaced a real discrepancy the prior card was reporting inaccurately:
+
+- BACC's PI controller regulates **SLA-violation budget burn rate** (`e_t = v_hat_t - epsilon_b`,
+  observed cumulative violation rate vs. a budget-derived target), not risk-vs-setpoint error.
+- BACC's PI output adjusts a **CPU-utilization threshold**, which a *separate* capacity-planning
+  optimizer converts to a replica count - not a direct replica-count output.
+- BACC's conformal calibration widens the **workload (request-rate) forecast itself**, which
+  then inflates the replica-count calculation - it does **not** cap the controller's step size the
+  way the project's earlier (inaccurate) card description claimed.
+- BACC has a **fixed**, non-adaptive per-cycle replica-change cap (`|x[t+h]-x[t]| <= rho`) and
+  clips its integral term for anti-windup - no mechanism reacts to the controller's own output
+  oscillating.
+
+User then asked for this - both the corrected mechanism and Module 3's own real formulas - folded
+into the novelty card, "simple and short with key pointing." Rewrote the card's body in
+`app/page.tsx` from two long paragraphs into two short bulleted lists (Published (BACC) / Module 3
+(this project), 3 bullets each) plus a one-line "Key difference" callout, replacing the
+paragraph-form explanation from the earlier pass entirely rather than layering a correction on
+top of it. The Evidence paragraph below (real synthetic multi-burst numbers) was left unchanged -
+it was already accurate.
+
+Verified: `tsc --noEmit` clean, `eslint` clean, non-ASCII sweep clean, local render test
+confirmed both new bullet-list headings and the corrected "SLA-violation budget burn rate" /
+"oscillation-conditioned widening" phrasing via curl against the dev server's RSC payload.
+Deployed to the VM, `tsc --noEmit` re-run clean there, same content confirmed server-side, and
+all eight routes re-confirmed at 200.
+
+---
+
 ## Phase 7 — Polish & cross-cutting
 
 | Task | Status | Notes |

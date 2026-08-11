@@ -211,24 +211,32 @@ export function MultiLineChart({
   const svgRef = useRef<SVGSVGElement>(null);
   const clipId = useId();
   const maxT = Math.max(1, ...series.map((s) => s.values.at(-1)?.t ?? 0));
+  // History has a safety-cap (see live-history.ts's MAX_POINTS) that drops
+  // the oldest points once a run has been live long enough - `startedAt`
+  // itself never moves, so without this the "fully zoomed out" view would
+  // keep assuming data starts at t=0 long after those early points are
+  // gone, wasting most of the plot on empty space. Using each series' own
+  // *current* first point keeps the axis matching what's actually stored.
+  const seriesStarts = series.map((s) => s.values[0]?.t).filter((t): t is number => t !== undefined);
+  const minT = seriesStarts.length > 0 ? Math.min(...seriesStarts) : 0;
   const hasAnyData = series.some((s) => usablePoints(s.values).length >= 2);
 
-  // null = fully zoomed out (showing the whole [0, maxT] history).
+  // null = fully zoomed out (showing the whole [minT, maxT] currently-stored history).
   const [zoomWindow, setZoomWindow] = useState<[number, number] | null>(null);
-  const [viewMin, viewMax] = zoomWindow ?? [0, maxT];
+  const [viewMin, viewMax] = zoomWindow ?? [minT, maxT];
   const isTimeZoomed = zoomWindow !== null;
 
   function clampWindow(center: number, width: number): [number, number] {
-    const w = Math.min(maxT, Math.max(MIN_WINDOW_SECONDS, width));
+    const w = Math.min(maxT - minT, Math.max(MIN_WINDOW_SECONDS, width));
     let lo = center - w / 2;
     let hi = center + w / 2;
-    if (lo < 0) { hi -= lo; lo = 0; }
+    if (lo < minT) { hi -= lo - minT; lo = minT; }
     if (hi > maxT) { lo -= hi - maxT; hi = maxT; }
-    return [Math.max(0, lo), Math.min(maxT, hi)];
+    return [Math.max(minT, lo), Math.min(maxT, hi)];
   }
 
   function zoomIn(anchor?: number) {
-    if (maxT <= MIN_WINDOW_SECONDS) return;
+    if (maxT - minT <= MIN_WINDOW_SECONDS) return;
     const center = anchor ?? (viewMin + viewMax) / 2;
     const width = (viewMax - viewMin) * ZOOM_STEP;
     setZoomWindow(clampWindow(center, width));
@@ -238,7 +246,7 @@ export function MultiLineChart({
     if (!isTimeZoomed) return;
     const center = anchor ?? (viewMin + viewMax) / 2;
     const width = (viewMax - viewMin) / ZOOM_STEP;
-    if (width >= maxT) {
+    if (width >= maxT - minT) {
       setZoomWindow(null);
     } else {
       setZoomWindow(clampWindow(center, width));
@@ -250,7 +258,7 @@ export function MultiLineChart({
   }
 
   function handleWheel(e: React.WheelEvent<SVGSVGElement>) {
-    if (!hasAnyData || maxT <= MIN_WINDOW_SECONDS) return;
+    if (!hasAnyData || maxT - minT <= MIN_WINDOW_SECONDS) return;
     const svg = svgRef.current;
     if (!svg || e.deltaY === 0) return;
     const pt = svg.createSVGPoint();
@@ -266,7 +274,7 @@ export function MultiLineChart({
     else zoomOut(anchor);
   }
 
-  const canZoomIn = hasAnyData && maxT > MIN_WINDOW_SECONDS && viewMax - viewMin > MIN_WINDOW_SECONDS + 1e-6;
+  const canZoomIn = hasAnyData && maxT - minT > MIN_WINDOW_SECONDS && viewMax - viewMin > MIN_WINDOW_SECONDS + 1e-6;
   const canZoomOut = isTimeZoomed;
 
   const [domainMin, domainMax] = autoFitY ? autoFitDomain(series, min, max, viewMin, viewMax) : [min, max];
@@ -318,7 +326,7 @@ export function MultiLineChart({
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="img"
         onWheel={handleWheel}
-        aria-label={`${label}: ${series.map((s) => s.label).join(", ")}, scaled ${fmt(domainMin)} to ${fmt(domainMax)}${yAutoFitted ? " (zoomed)" : ""}, showing ${formatElapsed(viewMin)} to ${formatElapsed(viewMax)} of ${formatElapsed(maxT)} elapsed`}
+        aria-label={`${label}: ${series.map((s) => s.label).join(", ")}, scaled ${fmt(domainMin)} to ${fmt(domainMax)}${yAutoFitted ? " (zoomed)" : ""}, showing ${formatElapsed(viewMin)} to ${formatElapsed(viewMax)} of ${formatElapsed(maxT - minT)} elapsed`}
         className="h-auto w-full touch-pan-y text-foreground"
       >
         <defs>
@@ -403,7 +411,7 @@ export function MultiLineChart({
         )}
         {isTimeZoomed ? (
           <span>
-            Showing {formatElapsed(viewMin)}–{formatElapsed(viewMax)} of {formatElapsed(maxT)}
+            Showing {formatElapsed(viewMin)}–{formatElapsed(viewMax)} of {formatElapsed(maxT - minT)}
           </span>
         ) : null}
       </div>

@@ -47,12 +47,66 @@ export function Module3Section() {
       <CardContent className="space-y-6">
         <section className="space-y-2">
           <h4 className="text-sm font-semibold text-foreground">Core control checks</h4>
-          <div className="flex flex-wrap gap-2">
-            <StatusBadge status={m.pass_criteria.pi_responds_and_bounded ? "pass" : "disclosed"} label="PI responds to step change, stays bounded" />
-            <StatusBadge status={m.pass_criteria.coverage_close_to_target ? "pass" : "disclosed"} label="Conformal coverage close to target" />
-            <StatusBadge status={m.pass_criteria.step_response_bounded ? "pass" : "disclosed"} label="Step response bounded" />
-            <StatusBadge status={m.pass_criteria.widens_after_reversal_spike ? "pass" : "disclosed"} label="Widens after reversal spike" />
-            <StatusBadge status={m.pass_criteria.full_beats_pi_conformal_instability ? "pass" : "disclosed"} label="Full beats PI+conformal (real trace)" />
+          <div className="space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-foreground">PI responds to step change, stays bounded</p>
+                <p className="text-xs text-muted-foreground">
+                  Isolated PI controller, synthetic step input: responds and settles at a
+                  bounded final value ({m.isolated_pi_test.final_value.toFixed(2)}), not
+                  diverging.
+                </p>
+              </div>
+              <StatusBadge status={m.pass_criteria.pi_responds_and_bounded ? "pass" : "disclosed"} />
+            </div>
+            <div className="flex items-start justify-between gap-3 border-t pt-2">
+              <div>
+                <p className="text-sm text-foreground">Conformal coverage close to target</p>
+                <p className="text-xs text-muted-foreground">
+                  {pct(m.coverage_check.empirical_coverage)} observed vs. {pct(m.coverage_check.target_coverage)} target,
+                  across {m.coverage_check.n_points} holdout points.
+                </p>
+              </div>
+              <StatusBadge status={m.pass_criteria.coverage_close_to_target ? "pass" : "disclosed"} />
+            </div>
+            <div className="flex items-start justify-between gap-3 border-t pt-2">
+              <div>
+                <p className="text-sm text-foreground">Step response bounded</p>
+                <p className="text-xs text-muted-foreground">
+                  Full loop (PI + conformal): pre-step {m.step_response_test.pre_step_value.toFixed(2)},
+                  settles to {m.step_response_test.final_value.toFixed(2)} within{" "}
+                  {m.step_response_test.settling_time_steps} steps, {m.step_response_test.overshoot.toFixed(2)}{" "}
+                  overshoot.
+                </p>
+              </div>
+              <StatusBadge status={m.pass_criteria.step_response_bounded ? "pass" : "disclosed"} />
+            </div>
+            <div className="flex items-start justify-between gap-3 border-t pt-2">
+              <div>
+                <p className="text-sm text-foreground">Widens after reversal spike</p>
+                <p className="text-xs text-muted-foreground">
+                  Correlation between reversal count and widened interval width:{" "}
+                  {m.sensitivity_check.correlation_reversal_count_vs_widened_width.toFixed(2)}.
+                  Width was {m.sensitivity_check.widened_width_before_max_reversal.toFixed(2)}{" "}
+                  before the run&apos;s worst spike ({m.sensitivity_check.max_reversal_count}{" "}
+                  reversals) and {m.sensitivity_check.widened_width_at_max_reversal.toFixed(2)}{" "}
+                  right after it.
+                </p>
+              </div>
+              <StatusBadge status={m.pass_criteria.widens_after_reversal_spike ? "pass" : "disclosed"} />
+            </div>
+            <div className="flex items-start justify-between gap-3 border-t pt-2">
+              <div>
+                <p className="text-sm text-foreground">Full beats PI+conformal (real trace)</p>
+                <p className="text-xs text-muted-foreground">
+                  {m.three_way_comparison.full.instability_reversals} reversals (full) vs.{" "}
+                  {m.three_way_comparison.pi_conformal.instability_reversals} (PI+conformal-only)
+                  on the real trace - tied, not a win. See the three-way comparison table below
+                  for the full breakdown and the synthetic test that settles it.
+                </p>
+              </div>
+              <StatusBadge status={m.pass_criteria.full_beats_pi_conformal_instability ? "pass" : "disclosed"} />
+            </div>
           </div>
           <StatGrid>
             <StatTile

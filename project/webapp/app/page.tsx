@@ -231,15 +231,36 @@ export default function ResearchOverviewPage() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <p>
-                The control loop that adjusts the alert threshold already uses a published
-                combination of a PI (proportional-integral) controller and conformal prediction
-                (a way of calibrating how much to trust the model right now) — from Liu, Li,
-                Farkiani &amp; Crowley, <em>BACC: Budget-Aware Calibration and Control for
-                Horizontal Autoscaling</em> (arXiv:2606.20575, 2026). This project adds one more
-                input on top of BACC&apos;s own mechanism: it counts how often the controller
-                has recently reversed direction, and widens its own safety margin in
-                proportion — so the permitted step shrinks precisely when the loop has been
-                oscillating, not only when the model&apos;s predictions have been inaccurate.
+                Published design: Liu, Li, Farkiani &amp; Crowley,{" "}
+                <em>BACC: Budget-Aware Calibration and Control for Horizontal Autoscaling</em>{" "}
+                (arXiv:2606.20575, 2026).
+              </p>
+              <div>
+                <p className="font-medium text-foreground">Published (BACC) — key points:</p>
+                <ul className="list-disc space-y-1 pl-5">
+                  <li>PI controller reacts to <strong className="text-foreground">SLA-violation budget burn rate</strong> — violations piling up too fast tightens it, running under budget relaxes it.</li>
+                  <li>Conformal inference widens the <strong className="text-foreground">traffic forecast itself</strong> when recent forecasts have been off; a separate formula then picks a replica count from that widened forecast.</li>
+                  <li>Per-cycle replica-count change is capped by a <strong className="text-foreground">fixed</strong> limit, always the same size.</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Module 3 (this project) — key points:</p>
+                <ul className="list-disc space-y-1 pl-5">
+                  <li>PI controller reacts to the gap between <strong className="text-foreground">Module 1&apos;s fused risk score</strong> and a target — not a violation budget.</li>
+                  <li>Conformal inference (ACI) directly caps <strong className="text-foreground">how far the threshold can move per step</strong>, based on how often recent predictions actually landed inside its own interval.</li>
+                  <li>
+                    <strong className="text-foreground">The individual novelty — &ldquo;oscillation-conditioned widening&rdquo;:</strong>{" "}
+                    that step cap is multiplied further by how many times the threshold has
+                    recently reversed direction — so movement shrinks when the loop itself has
+                    been oscillating, not only when predictions have been wrong.
+                  </li>
+                </ul>
+              </div>
+              <p>
+                <strong className="text-foreground">Key difference:</strong> BACC&apos;s only
+                sources of caution are budget pace and forecast accuracy — a fixed step cap either
+                way. Module 3 adds a third, independent source BACC has no way to see: the control
+                loop&apos;s own recent stability.
               </p>
               <p className="border-t pt-3 text-xs">
                 <strong className="text-foreground">Evidence: </strong>

@@ -40,29 +40,67 @@ export function Module1Section() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <section className="space-y-2">
+        <section className="space-y-3">
           <h4 className="text-sm font-semibold text-foreground">Validation checks</h4>
-          <div className="flex flex-wrap gap-2">
-            <StatusBadge
-              status={m.pass_criteria.fused_beats_cpu_baseline_auc_pr_holdout ? "pass" : "disclosed"}
-              label="Beats CPU-only baseline (holdout)"
-            />
-            <StatusBadge
-              status={m.pass_criteria.fused_beats_cpu_baseline_auc_pr_walkforward ? "pass" : "disclosed"}
-              label="Beats CPU-only baseline (walk-forward)"
-            />
-            <StatusBadge
-              status={m.pass_criteria.lead_time_positive_and_beats_baseline ? "pass" : "disclosed"}
-              label="Warns earlier than baseline"
-            />
-            <StatusBadge
-              status={m.pass_criteria.shap_sanity_check_majority_pass ? "pass" : "disclosed"}
-              label="TreeSHAP attributes the right signal (majority)"
-            />
-            <StatusBadge
-              status={m.pass_criteria.shap_sanity_check_all_pass ? "pass" : "disclosed"}
-              label="TreeSHAP attributes the right signal (all 4)"
-            />
+          <p className="text-xs text-muted-foreground">
+            Each check below states the real number behind it directly - the full
+            methodology (folds, episodes, per-signal breakdown) follows in the sections
+            underneath.
+          </p>
+          <div className="space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-foreground">Beats CPU-only baseline (holdout)</p>
+                <p className="text-xs text-muted-foreground">
+                  Fused AUC-ROC {m.holdout.fused_auc_roc.toFixed(2)} vs. baseline{" "}
+                  {m.holdout.baseline_auc_roc.toFixed(2)}, on a single time-ordered 75/25 split.
+                </p>
+              </div>
+              <StatusBadge status={m.pass_criteria.fused_beats_cpu_baseline_auc_pr_holdout ? "pass" : "disclosed"} />
+            </div>
+            <div className="flex items-start justify-between gap-3 border-t pt-2">
+              <div>
+                <p className="text-sm text-foreground">Beats CPU-only baseline (walk-forward)</p>
+                <p className="text-xs text-muted-foreground">
+                  Mean fused AUC-PR {m.walk_forward.mean_fused_auc_pr.toFixed(2)} vs. baseline{" "}
+                  {m.walk_forward.mean_baseline_auc_pr.toFixed(2)}, averaged across the 5
+                  retrain-and-test folds below.
+                </p>
+              </div>
+              <StatusBadge status={m.pass_criteria.fused_beats_cpu_baseline_auc_pr_walkforward ? "pass" : "disclosed"} />
+            </div>
+            <div className="flex items-start justify-between gap-3 border-t pt-2">
+              <div>
+                <p className="text-sm text-foreground">Warns earlier than baseline</p>
+                <p className="text-xs text-muted-foreground">
+                  Mean lead time {m.lead_time_comparison.mean_fused_lead_time.toFixed(2)} buckets
+                  (fused) vs. {m.lead_time_comparison.mean_baseline_lead_time.toFixed(2)} buckets
+                  (baseline), across {m.lead_time_comparison.n_episodes} real violation
+                  episodes - the baseline warned earlier here, a real negative result.
+                </p>
+              </div>
+              <StatusBadge status={m.pass_criteria.lead_time_positive_and_beats_baseline ? "pass" : "disclosed"} />
+            </div>
+            <div className="flex items-start justify-between gap-3 border-t pt-2">
+              <div>
+                <p className="text-sm text-foreground">TreeSHAP attributes the right signal (majority)</p>
+                <p className="text-xs text-muted-foreground">
+                  {m.shap_sanity_check.n_pass} of {m.shap_sanity_check.n_tested} perturbed signal
+                  families were correctly named as the dominant driver by TreeSHAP.
+                </p>
+              </div>
+              <StatusBadge status={m.pass_criteria.shap_sanity_check_majority_pass ? "pass" : "disclosed"} />
+            </div>
+            <div className="flex items-start justify-between gap-3 border-t pt-2">
+              <div>
+                <p className="text-sm text-foreground">TreeSHAP attributes the right signal (all 4)</p>
+                <p className="text-xs text-muted-foreground">
+                  Same check, stricter bar: all {m.shap_sanity_check.n_tested} must pass, not just
+                  most - the per-signal table below shows exactly which one didn&apos;t.
+                </p>
+              </div>
+              <StatusBadge status={m.pass_criteria.shap_sanity_check_all_pass ? "pass" : "disclosed"} />
+            </div>
           </div>
         </section>
 

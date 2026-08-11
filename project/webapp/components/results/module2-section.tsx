@@ -49,15 +49,32 @@ export function Module2Section() {
             candidate nodes — the rest had just one option. That is a small sample to detect
             a statistically clean win in, which is exactly what the two checks below found.
           </p>
-          <div className="flex flex-wrap gap-2">
-            <StatusBadge
-              status={m.pass_criteria.combined_beats_random_and_heuristic_regret ? "pass" : "disclosed"}
-              label="Combined system beats random & heuristic-only (regret)"
-            />
-            <StatusBadge
-              status={m.pass_criteria.discounted_beats_vanilla_on_shift_window ? "pass" : "disclosed"}
-              label="Discounted beats vanilla in the real shift window"
-            />
+          <div className="space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-foreground">Combined system beats random &amp; heuristic-only (regret)</p>
+                <p className="text-xs text-muted-foreground">
+                  Final cumulative regret: combined {m.regret_validation.final_cumulative_regret.combined_system.toFixed(2)},
+                  random {m.regret_validation.final_cumulative_regret.random.toFixed(2)},
+                  heuristic-only {m.regret_validation.final_cumulative_regret.heuristic_only.toFixed(2)} -
+                  the combined system beats random but not the heuristic (lower is better).
+                </p>
+              </div>
+              <StatusBadge status={m.pass_criteria.combined_beats_random_and_heuristic_regret ? "pass" : "disclosed"} />
+            </div>
+            <div className="flex items-start justify-between gap-3 border-t pt-2">
+              <div>
+                <p className="text-sm text-foreground">Discounted beats vanilla in the real shift window</p>
+                <p className="text-xs text-muted-foreground">
+                  Mean reward in the {m.discounted_vs_vanilla_ablation.n_rounds_in_window}-round
+                  real regime-shift window: discounted{" "}
+                  {m.discounted_vs_vanilla_ablation.discounted_mean_reward_in_window.toFixed(3)} vs.
+                  vanilla {m.discounted_vs_vanilla_ablation.vanilla_mean_reward_in_window.toFixed(3)} -
+                  vanilla edged it out here (see the disclosed finding below for why).
+                </p>
+              </div>
+              <StatusBadge status={m.pass_criteria.discounted_beats_vanilla_on_shift_window ? "pass" : "disclosed"} />
+            </div>
           </div>
           <StatGrid>
             <StatTile

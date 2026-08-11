@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArmBarChart } from "@/components/results/arm-bar-chart";
+import { ResultFigure } from "@/components/results/result-figure";
 import { StatusBadge } from "@/components/status-badge";
 import { EmptyState, InfoNote } from "@/components/empty-state";
 import {
@@ -8,10 +9,12 @@ import {
   ABLATION_METRIC_LABELS,
   loadStatisticalAnalysis,
   loadTrialLevelData,
+  resultImageUrl,
   type AblationMetricKey,
   type AblationStudy,
 } from "@/lib/results";
-import { ARM_LABELS } from "@/lib/colors";
+import type { CsvRow } from "@/lib/data";
+import { ARM_LABELS, ARM_ORDER, type Arm } from "@/lib/colors";
 
 const METRIC_KEYS = Object.keys(ABLATION_METRIC_LABELS) as AblationMetricKey[];
 
@@ -23,6 +26,32 @@ function formatMetricValue(key: AblationMetricKey, v: number): string {
     return v.toLocaleString(undefined, { maximumFractionDigits: 0 });
   }
   return v.toFixed(2);
+}
+
+/**
+ * Mean and sample standard deviation (n-1 denominator, matching pandas'
+ * default .std() - what phase7_analysis/statistical_analysis.py itself
+ * uses) per arm per metric, computed directly from the raw trial rows
+ * since statistical_analysis.json's omnibus_tests only carries the mean.
+ */
+function computeArmStats(
+  trials: CsvRow[],
+  arms: Arm[],
+): Record<Arm, Record<AblationMetricKey, { mean: number; std: number; n: number }>> {
+  const result = {} as Record<Arm, Record<AblationMetricKey, { mean: number; std: number; n: number }>>;
+  for (const arm of arms) {
+    const armTrials = trials.filter((t) => String(t.arm) === arm);
+    const metricStats = {} as Record<AblationMetricKey, { mean: number; std: number; n: number }>;
+    for (const key of METRIC_KEYS) {
+      const values = armTrials.map((t) => Number(t[key])).filter((v) => !Number.isNaN(v));
+      const n = values.length;
+      const mean = n > 0 ? values.reduce((a, b) => a + b, 0) / n : 0;
+      const variance = n > 1 ? values.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1) : 0;
+      metricStats[key] = { mean, std: Math.sqrt(variance), n };
+    }
+    result[arm] = metricStats;
+  }
+  return result;
 }
 
 export function AblationStudyPanel({ study }: Readonly<{ study: AblationStudy }>) {
@@ -42,6 +71,8 @@ export function AblationStudyPanel({ study }: Readonly<{ study: AblationStudy }>
       .filter((p) => p["significant_bh_0.05"])
       .map((p) => ({ metric: key, ...p })),
   );
+
+  const armStats = trials ? computeArmStats(trials, ARM_ORDER) : null;
 
   return (
     <div className="space-y-6">
@@ -99,6 +130,71 @@ export function AblationStudyPanel({ study }: Readonly<{ study: AblationStudy }>
               </div>
             );
           })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Mean +/- standard deviation, by arm</CardTitle>
+          <CardDescription>
+            Every metric, every arm, as one summary table - mean and sample standard
+            deviation across the {analysis.metadata.n_trials_per_arm.baseline} trials each
+            arm ran. Computed directly from the raw trial rows below, the same way{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">phase7_analysis/statistical_analysis.py</code>{" "}
+            computes its own means.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          {armStats ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Measure</TableHead>
+                  {ARM_ORDER.map((arm) => (
+                    <TableHead key={arm}>{ARM_LABELS[arm]}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {METRIC_KEYS.map((key) => (
+                  <TableRow key={key}>
+                    <TableCell className="font-medium text-foreground">
+                      {ABLATION_METRIC_LABELS[key]}
+                    </TableCell>
+                    {ARM_ORDER.map((arm) => {
+                      const s = armStats[arm][key];
+                      return (
+                        <TableCell key={arm}>
+                          {formatMetricValue(key, s.mean)} +/- {formatMetricValue(key, s.std)}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <EmptyState reason="trial_level_data.csv was not found for this study." />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Metric distributions by arm</CardTitle>
+          <CardDescription>
+            The same {analysis.metadata.n_trials_total} trials as a box plot per metric -
+            every individual trial (dots) alongside each arm&apos;s median (box) and mean
+            (triangle), so the spread behind the mean +/- standard deviation table above is
+            visible directly, not just summarized into two numbers.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResultFigure
+            src={resultImageUrl("phase7/metric_distributions_by_arm.png", study)}
+            alt="Box plots showing the distribution of each evaluation metric across the five ablation arms, five trials each"
+            caption={`Distribution of each evaluation metric across the five configurations (${analysis.metadata.n_trials_per_arm.baseline} trials each).`}
+          />
         </CardContent>
       </Card>
 

@@ -15,12 +15,25 @@ export const DATA_PROCESSED_DIR = path.join(PROJECT_DIR, "data", "processed");
 
 export const TARGET_DEPLOYMENT = "teastore-webui";
 
-// Mirrors project/live_cluster/module3_controller/app.py's THRESHOLD_BOUNDS and
-// actuator/app.py's MIN_REPLICAS/MAX_REPLICAS - module-level constants never
-// included in those components' own /state JSON, so duplicated here. Keep in
-// sync if the live-cluster components ever change them.
+// Mirrors project/live_cluster/module3_controller/app.py's THRESHOLD_BOUNDS -
+// a module-level constant never included in that component's own /state
+// JSON, so duplicated here. Keep in sync if the live-cluster component ever
+// changes it.
 export const MODULE3_THRESHOLD_BOUNDS: [number, number] = [0.01, 0.9];
-export const ACTUATOR_REPLICA_BOUNDS: [number, number] = [1, 3];
+
+// Two separate constants, not one - these must NOT be merged back together.
+// LIVE_ACTUATOR_REPLICA_BOUNDS mirrors actuator/app.py's live MAX_REPLICAS
+// (walked 3 -> 5 -> 4 -> 3 -> 4, all 2026-08-10, on user request for the
+// live webapp demo - see that file's own comment) and drives the Live Run
+// page's gauge/chart.
+// REFERENCE_ACTUATOR_REPLICA_BOUNDS is the completed results_v2 ablation
+// study's actual, unchanged ceiling (3) and drives the TeaStore page's
+// chart of a recorded historical trial - that chart must reflect what the
+// study really used, not whatever the live demo's ceiling currently is, or
+// it would misrepresent real historical data if the live value is ever
+// changed again.
+export const LIVE_ACTUATOR_REPLICA_BOUNDS: [number, number] = [1, 4];
+export const REFERENCE_ACTUATOR_REPLICA_BOUNDS: [number, number] = [1, 3];
 
 export interface PortForwardTarget {
   service: string;

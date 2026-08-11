@@ -7,7 +7,7 @@ import { StatTile, StatGrid } from "@/components/results/stat-tile";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoNote, EmptyState } from "@/components/empty-state";
 import { MultiLineChart } from "@/components/live/multi-line-chart";
-import { MODULE3_THRESHOLD_BOUNDS, ACTUATOR_REPLICA_BOUNDS } from "@/lib/config";
+import { MODULE3_THRESHOLD_BOUNDS, REFERENCE_ACTUATOR_REPLICA_BOUNDS } from "@/lib/config";
 import { loadReferenceTrial, getReferenceTimeSeries } from "@/lib/results";
 
 const SERVICES = [
@@ -267,8 +267,8 @@ export default function TeaStorePage() {
               />
               <MultiLineChart
                 label="Replica count during this trial"
-                min={ACTUATOR_REPLICA_BOUNDS[0]}
-                max={ACTUATOR_REPLICA_BOUNDS[1]}
+                min={REFERENCE_ACTUATOR_REPLICA_BOUNDS[0]}
+                max={REFERENCE_ACTUATOR_REPLICA_BOUNDS[1]}
                 series={[{ label: "Replicas", color: "var(--viz-magenta)", values: referenceSeries.replicas }]}
               />
             </div>

@@ -7,7 +7,7 @@ import { MultiLineChart, type NamedSeries, type TimeSeriesPoint } from "@/compon
 import { NoClusterCard } from "@/components/live/no-cluster-card";
 import { ComponentStatusTiles } from "@/components/live/component-status-tiles";
 import { ThresholdPinNote } from "@/components/live/threshold-pin-note";
-import { MODULE3_THRESHOLD_BOUNDS, ACTUATOR_REPLICA_BOUNDS } from "@/lib/config";
+import { MODULE3_THRESHOLD_BOUNDS, LIVE_ACTUATOR_REPLICA_BOUNDS } from "@/lib/config";
 import type { ActuatorStateResponse, ComponentFetch, Module1RiskResponse, Module3StateResponse } from "@/lib/live";
 import type { LiveHistoryPoint } from "@/lib/live-history";
 
@@ -173,6 +173,7 @@ export function LiveDashboard() {
             label="Predicted risk over time"
             min={0}
             max={1}
+            autoFitY
             emptyReason="Waiting for live readings from Module 1."
             series={[
               { label: "Live risk (Module 1, every 2s)", color: "var(--viz-orange)", values: riskLive },
@@ -214,6 +215,7 @@ export function LiveDashboard() {
             label="Risk as last seen by Module 3, over time"
             min={0}
             max={1}
+            autoFitY
             emptyReason="Waiting for live readings from Module 3."
             series={[{ label: "Risk seen by Module 3 (~2min polls)", color: "var(--viz-yellow)", values: m3RiskLive }]}
           />
@@ -239,6 +241,7 @@ export function LiveDashboard() {
             label="Alert threshold over time"
             min={MODULE3_THRESHOLD_BOUNDS[0]}
             max={MODULE3_THRESHOLD_BOUNDS[1]}
+            autoFitY
             emptyReason="Waiting for live readings from Module 3."
             series={[{ label: "Live threshold", color: "var(--viz-yellow)", values: thresholdLive }]}
           />
@@ -274,17 +277,18 @@ export function LiveDashboard() {
           <Speedometer
             label="Replicas (Actuator)"
             value={replicas}
-            min={ACTUATOR_REPLICA_BOUNDS[0]}
-            max={ACTUATOR_REPLICA_BOUNDS[1]}
+            min={LIVE_ACTUATOR_REPLICA_BOUNDS[0]}
+            max={LIVE_ACTUATOR_REPLICA_BOUNDS[1]}
             formatValue={(v) => v.toFixed(0)}
             tone="var(--viz-magenta)"
             unavailableReason={replicas === null ? "no live reading" : undefined}
           />
           <MultiLineChart
             label="Replica count over time"
-            min={ACTUATOR_REPLICA_BOUNDS[0]}
-            max={ACTUATOR_REPLICA_BOUNDS[1]}
+            min={LIVE_ACTUATOR_REPLICA_BOUNDS[0]}
+            max={LIVE_ACTUATOR_REPLICA_BOUNDS[1]}
             integerTicks
+            autoFitY
             emptyReason="Waiting for live readings from the Actuator."
             series={[{ label: "Live replica count", color: "var(--viz-magenta)", values: replicasLive }]}
           />
@@ -295,7 +299,7 @@ export function LiveDashboard() {
             Every cycle the Actuator compares Module 1&apos;s risk score against Module 3&apos;s
             threshold (both above): risk above threshold scales up by one replica, risk below
             half the threshold scales down by one, otherwise it holds — bounded to [
-            {ACTUATOR_REPLICA_BOUNDS[0]}, {ACTUATOR_REPLICA_BOUNDS[1]}] and rate-limited by a
+            {LIVE_ACTUATOR_REPLICA_BOUNDS[0]}, {LIVE_ACTUATOR_REPLICA_BOUNDS[1]}] and rate-limited by a
             cooldown so it can&apos;t thrash every cycle. Only Module 1 and Module 3 feed this
             decision — Module 2&apos;s bandit (right) plays no part in the replica{" "}
             <em>count</em>.
@@ -383,6 +387,7 @@ export function LiveDashboard() {
             unit="%"
             min={0}
             max={100}
+            autoFitY
             emptyReason="Waiting for live readings from the Kubernetes metrics API."
             series={[{ label: "CPU % of pod limit", color: "var(--viz-blue)", values: cpuLive }]}
           />
@@ -403,6 +408,7 @@ export function LiveDashboard() {
             unit="%"
             min={0}
             max={100}
+            autoFitY
             emptyReason="Waiting for live readings from the Kubernetes metrics API."
             series={[{ label: "Memory % of pod limit", color: "var(--viz-yellow)", values: memoryLive }]}
           />
