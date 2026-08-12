@@ -129,11 +129,13 @@ export default function DataPipelinePage() {
 
         <div className="space-y-4">
           <div>
+            <p className="text-sm font-semibold text-foreground">
+              Key point: real percentiles from individual call records, not an average.
+            </p>
             <p className="mb-2 text-sm text-muted-foreground">
-              The latency signal keeps only genuine outbound-response rows (<code className="rounded bg-muted px-1 py-0.5 text-xs">rt &lt; 0</code>,
+              Keeps only genuine outbound-response rows (<code className="rounded bg-muted px-1 py-0.5 text-xs">rt &lt; 0</code>,
               this trace&apos;s sign convention for a receiver-side response — or message-queue
-              calls, which don&apos;t follow it) and takes the true 95th/99th percentile per bucket,
-              not an average:
+              calls, which don&apos;t follow it) and takes the true 95th/99th percentile per bucket:
             </p>
             <CodeSnippet
               source="project/preprocessing/build_features.py"
@@ -151,6 +153,89 @@ latency = df_cg.groupby("time_bucket")["rt"].agg(
           </div>
 
           <div>
+            <p className="text-sm font-semibold text-foreground">
+              Key point: only real inbound demand — never mixed with outbound calls.
+            </p>
+            <p className="mb-2 text-sm text-muted-foreground">
+              Keeps only the four <em>provider-side</em> metrics — demand arriving at this
+              service, not calls it makes outward to its own dependencies (mixing the two would
+              corrupt the backlog reading) — averaged per bucket:
+            </p>
+            <CodeSnippet
+              source="project/preprocessing/build_features.py (build_load_signal)"
+              code={`df_qps = df_qps[df_qps["metric"].isin(cfg.provider_metrics)].copy()
+df_qps["time_bucket"] = (df_qps["timestamp"] // cfg.bucket_ms).astype(int)
+
+load = df_qps.pivot_table(
+    index="time_bucket", columns="metric", values="value", aggfunc="mean"
+).reset_index()`}
+            />
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              Key point: real CPU/memory usage, plus how many instances were actually running.
+            </p>
+            <p className="mb-2 text-sm text-muted-foreground">
+              Averages CPU/memory usage per bucket and counts distinct instance IDs — the same{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">active_instances</code> column
+              a later sanity check uses to flag a service that barely scales in this trace:
+            </p>
+            <CodeSnippet
+              source="project/preprocessing/build_features.py (build_resource_signal)"
+              code={`resource = df_res.groupby("time_bucket").agg(
+    cpu_utilization=("instance_cpu_usage", "mean"),
+    memory_utilization=("instance_memory_usage", "mean"),
+    active_instances=("msinstanceid", "nunique"),
+).reset_index()`}
+            />
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              Key point: combines all three signals, and only ever fills short gaps.
+            </p>
+            <p className="mb-2 text-sm text-muted-foreground">
+              The three signal tables are outer-joined on <code className="rounded bg-muted px-1 py-0.5 text-xs">time_bucket</code>,
+              then gaps are forward-filled for at most 2 consecutive buckets — long enough to
+              cover one source briefly missing a reading, never long enough to fabricate an
+              extended stretch of data that was never actually recorded:
+            </p>
+            <CodeSnippet
+              source="project/preprocessing/build_features.py (join_signal_tables, handle_gaps)"
+              code={`df = latency.merge(load, on="time_bucket", how="outer").merge(resource, on="time_bucket", how="outer")
+df = df.sort_values("time_bucket").reset_index(drop=True)
+
+signal_cols = [c for c in df.columns if c != "time_bucket"]
+df[signal_cols] = df[signal_cols].ffill(limit=2)
+df = df.dropna(subset=["p99_latency_ms"]).reset_index(drop=True)`}
+            />
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              Key point: rate of change, not just the raw value.
+            </p>
+            <p className="mb-2 text-sm text-muted-foreground">
+              Every signal except the two count-type columns gets 1/2/4-bucket rolling-change
+              columns — a signal climbing fast is often predictive before it ever crosses a
+              threshold:
+            </p>
+            <CodeSnippet
+              source="project/preprocessing/build_features.py (engineer_rolling_deltas)"
+              code={`exclude = {"call_count", "active_instances"}
+for w in (1, 2, 4):
+    for col in signal_cols:
+        if col in exclude:
+            continue
+        df[f"{col}_delta{w}"] = df[col].diff(w)`}
+            />
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              Key point: a self-referential threshold, shifted forward — forecasting, not detecting.
+            </p>
             <p className="mb-2 text-sm text-muted-foreground">
               The label isn&apos;t an external SLA number — it&apos;s derived from the service&apos;s
               own observed latency distribution, then shifted one bucket into the future so the
@@ -166,10 +251,12 @@ df = df.dropna(subset=["label_next_violation"]).reset_index(drop=True)`}
           </div>
 
           <div>
+            <p className="text-sm font-semibold text-foreground">
+              Key point: time-ordered, never shuffled — no future data leaks into training.
+            </p>
             <p className="mb-2 text-sm text-muted-foreground">
-              The train/test split is strictly time-ordered — never shuffled, since shuffling a
-              forecasting problem lets the model train on rows that come after the ones it&apos;s
-              tested on:
+              A random split would let the model train on rows that come <em>after</em> the ones
+              it&apos;s tested on — a forecasting problem always needs a time-ordered split instead:
             </p>
             <CodeSnippet
               source="project/preprocessing/build_features.py (time_based_split)"
@@ -180,6 +267,15 @@ df = df.dropna(subset=["label_next_violation"]).reset_index(drop=True)`}
             />
           </div>
         </div>
+
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          A final <code className="rounded bg-muted px-1 py-0.5 text-xs">run_sanity_checks()</code> pass
+          runs every time — row/column counts, any unexpected NaNs, the label rate overall and
+          separately for train/test, and the violation threshold itself — written to a
+          structured <code className="rounded bg-muted px-1 py-0.5 text-xs">metrics.json</code>, never
+          only printed to the console, so a bad run is caught by inspecting a file rather than
+          having to re-run the script and watch its output.
+        </p>
 
         <InfoNote>
           Exit artifact: one 360-row feature table (270 train / 90 test — full 12-hour

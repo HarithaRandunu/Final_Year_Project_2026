@@ -42,7 +42,9 @@ const MODULE3_SPEC: SpecRow[] = [
 ];
 
 const ACTUATOR_SPEC: SpecRow[] = [
-  { label: "Role", value: "The 4th live component - not one of the 3 modules, but the only one that actually changes anything. Reads Module 1's predicted_risk and Module 3's current threshold, applies a symmetric band rule (signal > threshold: +1 replica; signal < threshold x 0.5: -1 replica; else hold), and calls the Kubernetes API's scale subresource directly." },
+  { label: "Role", value: "The 4th live component - not one of the 3 modules, but the only one that actually changes anything. Reads Module 1's predicted_risk and Module 3's current threshold, applies a symmetric band rule (signal above threshold: scale up; signal below half the threshold: scale down; else hold), sized proportionally to how far past that line the signal sits (not a fixed step - see below), and calls the Kubernetes API's scale subresource directly." },
+  { label: "How it sizes each step", value: "replicas_to_move = ceil((signal - threshold) / effective_unit), where effective_unit = STEP_UNIT x Module 3's own widening_multiplier - so the same excess signal moves fewer replicas at once when Module 3 has recently detected instability, reusing that module's own individual-novelty output rather than adding an unrelated second damping mechanism" },
+  { label: "Key parameters", value: "STEP_UNIT=0.05 (matches Module 3's base_max_step), MAX_JUMP=2 (hard per-cycle cap regardless of gap size), COOLDOWN_SECONDS=90 (mirrors HPA's own stabilization window, for a fair ablation comparison) (live_cluster/actuator/app.py)" },
   { label: "Bounds", value: "Replica count bounded to [1, 3] (the same minReplicas/maxReplicas range every ablation arm shares, including the standard-autoscaler baseline)" },
   { label: "Code", value: "live_cluster/actuator/app.py" },
   { label: "Live API", value: "Port 8092 - GET /state, GET /healthz. Acts every 30s." },
@@ -172,7 +174,7 @@ export default function ProjectOverviewPage() {
       <Separator />
 
       <section className="space-y-4">
-        <h2 className="text-2xl font-semibold tracking-tight">The three modules, in detail</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">The three modules and the actuator, in detail</h2>
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -250,6 +252,38 @@ export default function ProjectOverviewPage() {
                   { title: "Set a safety margin", description: "based on that accuracy" },
                   { title: "Widen it further", description: "if the controller has been jumpy lately" },
                   { title: "Adjust the threshold", description: "safely, within that margin" },
+                ]}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>The Actuator — turning a threshold into an action</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                Not one of the three modules — none of them touches Kubernetes directly. Every
+                30 seconds the actuator reads two numbers: Module 1&apos;s risk score and Module
+                3&apos;s current threshold. Above the threshold means scale up; below half the
+                threshold means scale down; the gap in between is a deliberate dead zone, so a
+                signal hovering right at the line doesn&apos;t cause constant flip-flopping.
+              </p>
+              <p>
+                How <em>many</em> replicas move isn&apos;t a fixed amount — a bigger gap moves
+                more replicas at once, calculated fresh every cycle. That calculation reuses
+                Module 3&apos;s own instability signal directly: the same excess risk moves
+                <em> fewer</em> replicas when Module 3 has recently detected the threshold
+                oscillating, so a jumpy period automatically produces smaller, more cautious
+                moves instead of amplifying the instability further. A short cooldown after
+                every action stops it from reacting to noise between cycles.
+              </p>
+              <StepFlow
+                steps={[
+                  { title: "Read the gap", description: "risk score vs. the current threshold" },
+                  { title: "Pick a direction", description: "up, down, or hold — with a dead zone between" },
+                  { title: "Size the move", description: "bigger gap moves more; recent jumpiness moves less" },
+                  { title: "Act on Kubernetes", description: "the real replica count actually changes" },
                 ]}
               />
             </CardContent>

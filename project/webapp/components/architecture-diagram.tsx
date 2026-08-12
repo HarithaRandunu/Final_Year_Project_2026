@@ -20,7 +20,7 @@ export function ArchitectureDiagram() {
     <DiagramFigure
       viewBox="0 0 1100 700"
       minWidth={760}
-      ariaLabel="Diagram: the application sends its current speed and load to Module 1, which sends a risk score and reason to Module 3. Module 2 sends machine health to Module 3. Module 3 sends its decision to the Actuator. The Actuator tells Kubernetes to change the replica count; Kubernetes carries that out on the application, and also hosts the scheduler that Module 2 plugs into to help place new copies."
+      ariaLabel="Diagram: the application sends its current speed and load to Module 1, which sends a risk score and reason to Module 3. Module 2 sends machine health to Module 3. Module 3 sends its decision to the Actuator. The Actuator tells Kubernetes to change the replica count; Kubernetes carries that out on the application. Kubernetes' own scheduler also asks Module 2 which node is best for each new copy, and Module 2 answers with a priority score the scheduler actually uses - not a read-only connection."
       caption="The three modules, the actuator, and Kubernetes itself — the platform that actually carries out scaling and placement, and hosts the scheduler Module 2 plugs into."
     >
       <ArrowheadDefs />
@@ -71,16 +71,22 @@ export function ArchitectureDiagram() {
         labelAt={[250, 538]}
       />
       {/*
-        Kubernetes' own scheduler calls out to Module 2 for help scoring
-        candidate nodes. This line only runs y=510-590, too short to hold its
-        own label without colliding with "scales the app" next to it, so the
-        label sits to the right of the line in the clear strip below Module 2
-        and above Kubernetes, well clear of every other line and label.
+        Module 2 <-> Kubernetes is a real round trip, not a read-only probe -
+        Kubernetes' scheduler calls out to Module 2 for help scoring
+        candidate nodes (arrow up, into Module 2), and Module 2 answers with
+        a priority score the scheduler actually uses to place the pod (a
+        second, parallel arrow back down, into Kubernetes). Drawn as two
+        separate lines, offset a few px apart, since DiagramArrow only ever
+        draws one arrowhead (at the path's end) - a single shared line would
+        wrongly imply the interaction only runs one way. Both still fit
+        inside the y=510-590 strip below Module 2 and above Kubernetes,
+        clear of every other line; labels are stacked at different y's so
+        they don't collide with each other.
       */}
       <DiagramArrow points={[[450, 590], [450, 510]]} />
       <text
         x={466}
-        y={555}
+        y={535}
         fontSize={12}
         paintOrder="stroke"
         stroke="var(--card)"
@@ -89,6 +95,19 @@ export function ArchitectureDiagram() {
         className="fill-muted-foreground"
       >
         asks which node is best
+      </text>
+      <DiagramArrow points={[[478, 510], [478, 590]]} />
+      <text
+        x={494}
+        y={568}
+        fontSize={12}
+        paintOrder="stroke"
+        stroke="var(--card)"
+        strokeWidth={5}
+        strokeLinejoin="round"
+        className="fill-muted-foreground"
+      >
+        priority score
       </text>
 
       {/*

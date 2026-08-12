@@ -52,7 +52,7 @@ import pandas as pd
 
 MODEL_PATH = Path(os.environ.get("MODEL_PATH", "/app/model_primary.joblib"))
 BUCKET_SECONDS = int(os.environ.get("BUCKET_SECONDS", "120"))
-PROBES_PER_BUCKET = int(os.environ.get("PROBES_PER_BUCKET", "8"))
+PROBES_PER_BUCKET = int(os.environ.get("PROBES_PER_BUCKET", "24"))
 HISTORY_LEN = int(os.environ.get("HISTORY_LEN", "40"))
 VIOLATION_WINDOW = int(os.environ.get("VIOLATION_WINDOW", "30"))
 VIOLATION_PERCENTILE = float(os.environ.get("VIOLATION_PERCENTILE", "0.9"))
@@ -133,9 +133,15 @@ def get_live_resource_signals() -> dict:
     )
     replicas = deployment.get("status", {}).get("replicas", 0)
 
+    # Divide by 100 before returning: the model was trained on Alibaba's
+    # instance_cpu_usage/instance_memory_usage, which are 0-1 fractions
+    # (training range ~0.30-0.37 cpu, ~0.73-0.74 memory - see
+    # features_primary.parquet), not 0-100 percentages. Feeding a raw
+    # percentage here put live values 100x outside anything the model saw
+    # in training, so real overload barely moved predicted_risk.
     return {
-        "cpu_utilization": statistics.fmean(cpu_pcts) if cpu_pcts else 0.0,
-        "memory_utilization": statistics.fmean(mem_pcts) if mem_pcts else 0.0,
+        "cpu_utilization": (statistics.fmean(cpu_pcts) if cpu_pcts else 0.0) / 100.0,
+        "memory_utilization": (statistics.fmean(mem_pcts) if mem_pcts else 0.0) / 100.0,
         "active_instances": float(replicas),
     }
 

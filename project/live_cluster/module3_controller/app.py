@@ -178,7 +178,10 @@ class ControlLoop:
             m2_state = None
 
         if M3_MODE == "cpu_direct":
-            control_signal = cpu_utilization / 100.0 if cpu_utilization is not None else None
+            # cpu_utilization already arrives as a 0-1 fraction from Module 1
+            # (fixed 2026-08-12 - was a raw 0-100 percentage before, which
+            # also broke predicted_risk's scale in "risk" mode).
+            control_signal = cpu_utilization
         else:
             control_signal = risk
 

@@ -108,7 +108,7 @@ def load_config(config_path: Path | None, data_dir: Path, overrides: dict) -> Pi
 
 
 # ---------------------------------------------------------------------------
-# Section 3 - candidate selection
+# Section 3 - candidate selection 
 # ---------------------------------------------------------------------------
 
 def count_calls_per_receiver(paths: Iterable[Path], chunksize: int = 1_000_000) -> pd.Series:

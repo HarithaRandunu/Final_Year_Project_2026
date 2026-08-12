@@ -152,8 +152,9 @@ def read_signal_and_threshold() -> tuple[float | None, float | None, float]:
 
     risk = m1.get("predicted_risk")
     bucket = m1.get("last_bucket") or {}
+    # Already a 0-1 fraction from Module 1 (fixed 2026-08-12 - was a raw
+    # 0-100 percentage before, which also broke predicted_risk's scale).
     cpu_fraction = bucket.get("cpu_utilization")
-    cpu_fraction = cpu_fraction / 100.0 if cpu_fraction is not None else None
 
     if ARM == "m1_only":
         return risk, FIXED_THRESHOLD, 1.0

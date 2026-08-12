@@ -341,8 +341,20 @@ spec:
               cpu: 150m
               memory: 640Mi
             limits:
-              cpu: 500m
-              memory: 1536Mi
+              # Raised 2026-08-12 from 500m/1536Mi: that limit survived a
+              # bounded ~17.5min load job (which then finished, giving the
+              # JVM a full recovery window) but OOMKilled repeatedly (exit
+              # 137) under a continuously-looping version of the same ramp
+              # with no recovery gap. Worker node has real headroom (was
+              # 36% memory used - see `kubectl top nodes`) to support this.
+              # Raised again same day, 3072Mi -> 4608Mi: at a sustained
+              # ~150 req/s rate (matched to the training data's own
+              # HTTP_MCR range), 3072Mi only survived ~6min between
+              # OOMKills - too frequent, each restart disrupts Module 1's
+              # signal and can trigger Module 3's oscillation-widening
+              # defense. Node still had 73%+ memory free at this point.
+              cpu: 1000m
+              memory: 4608Mi
 ---
 apiVersion: v1
 kind: Service
